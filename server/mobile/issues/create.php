@@ -27,7 +27,7 @@
  */
 
     auth();
-    response();
+    response(200, "123");
 
 /*
     jira_require();
