@@ -36,7 +36,8 @@
 
         foreach ($flatDetail['entrances'] as $entrance) {
             $domophoneId = intval($entrance['domophoneId']);
-            $doorId = intval($entrance['entranceId']);
+            $e = $households->getEntrance($entrance['entranceId']);
+            $doorId = intval($e['domophoneOutput']);
             
             if($domophone_id == $domophoneId && $door_id == $doorId) {
                 $blocked = false;
@@ -53,8 +54,13 @@
         $households = loadBackend("households");
         $domophone = $households->getDomophone($domophone_id);
 
-        $model = loadDomophone($domophone["model"], $domophone["url"], $domophone["credentials"]);
-        $model->open_door($door_id);
+        try {
+            $model = loadDomophone($domophone["model"], $domophone["url"], $domophone["credentials"]);
+            $model->open_door($door_id);
+        }
+        catch (\Exception $e) {
+            response(404, false, 'Ошибка', 'Домофон недоступен');
+        }
         response();
     } else {
         response(404, false, 'Не найдено', 'Услуга недоступна (договор заблокирован либо не оплачен)');
