@@ -40,7 +40,9 @@
                 foreach ($dir as $f) {
                     if ($f != "." && $f != ".." && file_exists($base . $f)) {
                         $f = pathinfo($f);
-                        $w[$f['filename']] = 'builtIn';
+                        if ($f['extension'] === "php") {
+                            $w[$f['filename']] = 'builtIn';
+                        }
                     }
                 }
 
@@ -52,7 +54,9 @@
                     foreach ($dir as $f) {
                         if ($f != "." && $f != ".." && file_exists($base . $f)) {
                             $f = pathinfo($f);
-                            $w[$f['filename']] = 'custom';
+                            if ($f['extension'] === "php") {
+                                $w[$f['filename']] = 'custom';
+                            }
                         }
                     }
                 }
@@ -447,5 +451,102 @@
              */
             abstract public function availableFilters();
 
+            /**
+             * @param $filter
+             * @return false|string
+             */
+            public function getFilter($filter) {
+
+                $filter = trim($filter);
+
+                if (!preg_match('/^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(\\[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)*$/', $filter)) {
+                    return false;
+                }
+
+                $class = get_class($this);
+                $ns = __NAMESPACE__;
+
+                if (strpos($class, $ns) === 0) {
+                    $class = substr($class, strlen($ns) + 1);
+                }
+
+                $file = dirname(__FILE__) . "/" . $class . "/filters/" . $filter . ".json";
+
+                if (file_exists($file)) {
+                    return file_get_contents($file);
+                } else {
+                    return "{}";
+                }
+            }
+
+            /**
+             * @param $filter
+             * @param $body
+             * @return boolean
+             */
+            public function putFilter($filter, $body) {
+
+                $filter = trim($filter);
+
+                if (!preg_match('/^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(\\[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)*$/', $filter)) {
+                    return false;
+                }
+
+                $class = get_class($this);
+                $ns = __NAMESPACE__;
+
+                if (strpos($class, $ns) === 0) {
+                    $class = substr($class, strlen($ns) + 1);
+                }
+
+                $dir = dirname(__FILE__) . "/" . $class . "/filters";
+                $file = $dir . "/" . $filter . ".json";
+
+                try {
+                    if (!file_exists($dir)) {
+                        mkdir($dir);
+                    }
+
+                    file_put_contents($file, $body);
+
+                    return true;
+                } catch (\Exception $e) {
+                    return false;
+                }
+            }
+
+            /**
+             * @param $filter
+             * @return boolean
+             */
+            public function deleteFilter($filter) {
+                $filter = trim($filter);
+
+                if (!preg_match('/^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(\\[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)*$/', $filter)) {
+                    return false;
+                }
+
+                $class = get_class($this);
+                $ns = __NAMESPACE__;
+
+                if (strpos($class, $ns) === 0) {
+                    $class = substr($class, strlen($ns) + 1);
+                }
+
+                $dir = dirname(__FILE__) . "/" . $class . "/filters";
+                $fileCustom = $dir . "/" . $filter . ".json";
+
+                try {
+                    if (file_exists($fileCustom)) {
+                        unlink($fileCustom);
+
+                        return true;
+                    }
+
+                    return false;
+                } catch (\Exception $e) {
+                    return false;
+                }
+            }
         }
     }
