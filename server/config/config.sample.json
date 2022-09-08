@@ -103,6 +103,11 @@
         "providers": {
             "backend": "lanta",
             "providers.json": "/path/to/providers.json"
+        },
+
+        "inbox": {
+            "backend": "internal",
+            "title": "Теледом"
         }
     },
 
