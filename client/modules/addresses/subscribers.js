@@ -418,6 +418,41 @@
                                 data: owner?i18n("yes"):i18n("no"),
                             },
                         ],
+                        dropDown: {
+                            items: [
+                                {
+                                    icon: "far fa-envelope",
+                                    title: i18n("addresses.sendMessageMobile"),
+                                    click: subscriberId => {
+                                        cardForm({
+                                            title: i18n("addresses.sendMessageMobileTitle"),
+                                            footer: true,
+                                            borderless: true,
+                                            size: "lg",
+                                            fields: [
+                                                {
+                                                    id: "msgText",
+                                                    type: "text",
+                                                    title: i18n("addresses.sendMessageMobileFor", list[i].mobile),
+                                                    validate: (v) => {
+                                                        return $.trim(v) !== "";
+                                                    }
+                                                },
+                                            ],
+                                            callback: function (result) {
+                                                if (result.msgText) {
+                                                    POST("inbox", "inbox", subscriberId, result)
+                                                        .fail(FAIL)
+                                                        .done(() => {
+                                                            message(i18n("addresses.sendMessageMobileSuccessful"));
+                                                        });
+                                                }
+                                            },
+                                        }).show();
+                                    },
+                                },
+                            ],
+                        },
                     });
                 }
 
