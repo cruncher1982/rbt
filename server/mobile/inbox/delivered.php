@@ -13,6 +13,14 @@
  */
 
 auth();
+
+$inbox = loadBackend("inbox");
+$msg_id = @$postdata['messageId'];
+if (!$msg_id) {
+    response(422);
+}
+
+$inbox->markMessagesAsDelivered([$msg_id]);
 response();
 
 /*

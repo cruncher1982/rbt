@@ -16,11 +16,13 @@
 
 auth();
 
-// TODO: получить число непрочитанных сообщений в чате и в сообщениях
-$unreaded = 0;
+// TODO: получить число непрочитанных сообщений в чате
 $chat = 0;
 
+$inbox = loadBackend("inbox");
+$count_unread = $inbox->countUnreadMessages((int)$subscriber['subscriberId']);
+
 response(200, [
-    'count' => $unreaded,
+    'count' => $count_unread,
     'chat' => $chat,
 ]);

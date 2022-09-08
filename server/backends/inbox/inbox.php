@@ -15,38 +15,42 @@
         {
             /**
              * Получить список всех сообщений подписчика
-             * @param $subscriberId
+             * @param int $subscriberId идентификатор подписчика
              * @return false|array
              */
             abstract function getMessages($subscriberId);
 
             /**
+             * Получить количество непрочитанных сообщений
+             * @param int $subscriberId идентификатор подписчика
+             * @return int
+             */
+            abstract function countUnreadMessages($subscriberId): int;
+
+            /**
              * Пометить сообщения как доставленные
              * @param array $msgIds массив идентификаторов сообщений
-             * @return bool
              */
-            abstract function markMessagesAsDelivered($msgIds): bool;
+            abstract function markMessagesAsDelivered($msgIds);
 
             /**
              * Пометить сообщения как прочитанные
              * @param array $msgIds массив идентификаторов сообщений
-             * @return bool
              */
-            abstract function markMessagesAsRead($msgIds): bool;
+            abstract function markMessagesAsRead($msgIds);
 
             /**
              * Пометить все сообщения подписчика как доставленные
              * @param int $subscriberId идентификатор подписчика
-             * @return bool
              */
-            abstract function markAllMessagesAsDelivered($subscriberId): bool;
+            abstract function markAllMessagesAsDelivered($subscriberId);
 
             /**
              * Пометить все сообщения подписчика как прочитанные
              * @param int $subscriberId идентификатор подписчика
              * @return bool
              */
-            abstract function markAllMessagesAsRead($subscriberId): bool;
+            abstract function markAllMessagesAsRead($subscriberId);
 
             /**
              * Отправить сообщение подписчику

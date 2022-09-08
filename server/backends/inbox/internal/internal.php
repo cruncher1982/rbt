@@ -35,33 +35,82 @@
             /**
              * @inheritDoc
              */
-            function markMessagesAsDelivered($msgIds): bool
+            function countUnreadMessages($subscriberId): int
             {
-                // TODO: Implement markMessagesAsDelivered() method.
+                if (!checkInt($subscriberId)) {
+                    return 0;
+                }
+
+                $r = $this->db->get(
+                    "select count(*) cnt_unread from inbox_subscribers_mobile where house_subscriber_id = :house_subscriber_id and flag_read = 0",
+                    [
+                        ":house_subscriber_id" => $subscriberId,
+                    ],
+                    ["cnt_unread" => "countUnread"],
+                    ["singlify"]
+                );
+
+                if (!$r) {
+                    return 0;
+                }
+
+                return (int)$r['countUnread'];
             }
 
             /**
              * @inheritDoc
              */
-            function markMessagesAsRead($msgIds): bool
+            function markMessagesAsDelivered($msgIds)
             {
-                // TODO: Implement markMessagesAsRead() method.
+                foreach ($msgIds as $msgId) {
+                    $this->db->modify("update inbox_subscribers_mobile set flag_delivered = 1 where msg_id = :msg_id",
+                        [
+                            ":msg_id" => $msgId
+                        ]);
+                }
             }
 
             /**
              * @inheritDoc
              */
-            function markAllMessagesAsDelivered($subscriberId): bool
+            function markMessagesAsRead($msgIds)
             {
-                // TODO: Implement markAllMessagesAsDelivered() method.
+                foreach ($msgIds as $msgId) {
+                    $this->db->modify("update inbox_subscribers_mobile set flag_read = 1 where msg_id = :msg_id",
+                        [
+                            ":msg_id" => $msgId
+                        ]);
+                }
             }
 
             /**
              * @inheritDoc
              */
-            function markAllMessagesAsRead($subscriberId): bool
+            function markAllMessagesAsDelivered($subscriberId)
             {
-                // TODO: Implement markAllMessagesAsRead() method.
+                if (!checkInt($subscriberId)) {
+                    return;
+                }
+
+                $this->db->modify("update inbox_subscribers_mobile set flag_delivered = 1 where house_subscriber_id = :subscriber_id",
+                    [
+                        ":subscriber_id" => $subscriberId
+                    ]);
+            }
+
+            /**
+             * @inheritDoc
+             */
+            function markAllMessagesAsRead($subscriberId)
+            {
+                if (!checkInt($subscriberId)) {
+                    return;
+                }
+
+                $this->db->modify("update inbox_subscribers_mobile set flag_read = 1 where house_subscriber_id = :subscriber_id",
+                    [
+                        ":subscriber_id" => $subscriberId
+                    ]);
             }
 
             /**
@@ -69,7 +118,41 @@
              */
             function sendMessage($subscriberId, $msgText): bool
             {
-                // TODO: Implement sendMessage() method.
+                if (!checkInt($subscriberId)) {
+                    return false;
+                }
+
+                $households = loadBackend("households");
+                $subscriber = $households->getSubscribers("id", $subscriberId)[0];
+
+                if (!$subscriber) {
+                    return false;
+                }
+
+                $msg_id = md5(time() + rand());
+                $r = $this->db->insert("insert into inbox_subscribers_mobile(msg_id, house_subscriber_id, msg_date, msg_text) values(:msg_id, :subscriber_id, :msg_date, :msg_text)",
+                    [
+                        ":msg_id" => $msg_id,
+                        ":subscriber_id" => $subscriberId,
+                        ":msg_date" => date('Y-m-d H:i:s', time()),
+                        ":msg_text" => $msgText,
+                    ]);
+                if (!$r) {
+                    return false;
+                }
+
+                global $config;
+                $isdn = loadBackend("isdn");
+                $payload = [
+                    "title" => @$config["backends"]["inbox"]["title"] ?: "Теледом",  // без этого поля пуш не уходит
+                    "token" => $subscriber['pushToken'],
+                    "messageId" => $msg_id,
+                    "message_id" => $msg_id,
+                    "msg" => $msgText,
+                    "badge" => "1",
+                ];
+
+                return ($isdn->push($payload) == "OK");
             }
         }
     }

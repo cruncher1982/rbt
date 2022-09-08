@@ -16,18 +16,19 @@
 
     auth();
 
-    // $html = "<html><h1>Hello</h1></html>";
-    // response(200, [ 'basePath' => "https://192.168.13.39/", 'code' => trim($html) ]);
-
     require_once __DIR__ . "/../../lib/parsedown/Parsedown.php";
-
     $parsedown = new Parsedown();
+    $inbox = loadBackend("inbox");
+    $msgs = array_map(function($item) {
+        return ['date' => $item['msgDate'], 'msg' => $item['msgText']];
+    }, $inbox->getMessages((int)$subscriber['subscriberId']));
+    $inbox->markAllMessagesAsRead((int)$subscriber['subscriberId']);
 
-    $msgs = [
+    /*$msgs = [
         ['date' => '01-01-2022T10:10:10', 'msg' => 'Добро пожаловать! Это просто тестовое сообщение.']
     ];
 
-    usort($msgs, function ($a, $b) {
+    /*usort($msgs, function ($a, $b) {
         if (strtotime($a['date']) > strtotime($b['date'])) {
             return -1;
         } else
@@ -36,7 +37,7 @@
             } else {
                 return 0;
             }
-    });
+    });*/
 
     $nd = false;
     // setlocale (LC_TIME, 'ru_RU.UTF-8', 'Rus');
