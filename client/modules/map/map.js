@@ -4,6 +4,14 @@
     init: function () {
         leftSide("fas fa-fw fa-map-marked-alt", i18n("map.map"), "?#map", "map");
 
+        function trim(str) {
+            return str.trim ? str.trim() : str.replace(/^\s+|\s+$/g, '');
+        }
+
+        function splitWords(str) {
+            return trim(str).split(/\s+/);
+        }
+
         L.Util.isArray = Array.isArray || function (obj) {
             return (Object.prototype.toString.call(obj) === '[object Array]');
         };
@@ -30,6 +38,33 @@
             return className.length > 0 && new RegExp('(^|\\s)' + name + '(\\s|$)').test(className);
         };
 
+        L.DomUtil.addClass = function (el, name) {
+            if (el.classList !== undefined) {
+                let classes = splitWords(name);
+                for (let i = 0, len = classes.length; i < len; i++) {
+                    el.classList.add(classes[i]);
+                }
+            } else if (!hasClass(el, name)) {
+                let className = getClass(el);
+                setClass(el, (className ? className + ' ' : '') + name);
+            }
+        }
+
+        L.DomUtil.removeClass = function (el, name) {
+            if (el.classList !== undefined) {
+                el.classList.remove(name);
+            } else {
+                setClass(el, trim((' ' + getClass(el) + ' ').replace(' ' + name + ' ', ' ')));
+            }
+        }
+
+        L.Util.indexOf = function (array, el) {
+            for (var i = 0; i < array.length; i++) {
+                if (array[i] === el) { return i; }
+            }
+            return -1;
+        }
+
         moduleLoaded("map", this);
     },
 
@@ -44,7 +79,11 @@
         $("#altForm").hide();
         $("#mainForm").html(`<div id='mapContainer' style='width: 100%; height: ${height}px; border: solid thin #dee2e6;' class='mt-2 resizable'></div>`);
 
-        modules.map.map = L.map('mapContainer');
+        modules.map.map = L.map('mapContainer', { editable: true });
+
+        if (config.map && config.map.hideAttribution) {
+            $(".leaflet-control-attribution").hide();
+        }
 
         if (config.map && config.map.crs) {
             switch (config.map.crs) {
@@ -81,7 +120,12 @@
             }
         }
 
-//        let layer_markers = new L.markerClusterGroup({ spiderfyOnMaxZoom: false, disableClusteringAtZoom: 15, });
+        modules.map.map.addControl(new L.Control.Fullscreen({
+            title: {
+                'false': i18n("fullscreen"),
+                'true': i18n("exitFullscreen"),
+            }
+        }));
 
         if (typeof lon != "undefined" && typeof lat != "undefined") {
             modules.map.map.setView([lat, lon], zoom);
@@ -89,6 +133,8 @@
                 L.marker([lat, lon]).addTo(modules.map.map);
             }
 /*
+            let layer_markers = new L.markerClusterGroup({ spiderfyOnMaxZoom: false, disableClusteringAtZoom: 15, });
+
             let homeMarker = L.AwesomeMarkers.icon({
                 icon: 'home fas fa-fw fa-home',
                 color: 'green'
@@ -98,6 +144,13 @@
             }
             layer_markers.addTo(modules.map.map);
             modules.map.map.fitBounds(layer_markers.getBounds());
+
+            // polygon editor
+            let pl = modules.map.map.editTools.startPolygon(); // start polygon editor
+
+            pl.getLatLngs(); // get polygon points
+
+            modules.map.map.removeLayer(pl);
 */
         } else {
             if (!navigator.geolocation) {

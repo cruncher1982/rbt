@@ -241,5 +241,11 @@
     ],
     "75": [
         "v75_readonly.sql"
+    ],
+    "76": [
+        "v76_custom_fields.sql"
+    ],
+    "77": [
+        "v77_custom_fields.sql"
     ]
 }

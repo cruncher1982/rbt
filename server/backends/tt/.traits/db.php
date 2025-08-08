@@ -216,6 +216,7 @@
                     }
 
                     $this->cacheSet($key, $_projects);
+
                     return $_projects;
                 } catch (\Exception $e) {
                     error_log(print_r($e, true));
@@ -658,6 +659,7 @@
                             type,
                             field,
                             field_display,
+                            field_display_list,
                             field_description,
                             regex,
                             link,
@@ -695,6 +697,7 @@
                             "type" => $customField["type"],
                             "field" => $customField["field"],
                             "fieldDisplay" => $customField["field_display"],
+                            "fieldDisplayList" => $customField["field_display_list"],
                             "fieldDescription" => $customField["field_description"],
                             "regex" => $customField["regex"],
                             "link" => $customField["link"],
@@ -722,7 +725,7 @@
              * @inheritDoc
              */
 
-            public function addCustomField($catalog, $type, $field, $fieldDisplay) {
+            public function addCustomField($catalog, $type, $field, $fieldDisplay, $fieldDisplayList) {
                 $this->clearCache();
 
                 $catalog = trim($catalog);
@@ -737,8 +740,8 @@
                 try {
                     $sth = $this->db->prepare("
                         insert into
-                            tt_issue_custom_fields (catalog, type, field, field_display)
-                        values (:catalog, :type, :field, :field_display)
+                            tt_issue_custom_fields (catalog, type, field, field_display, field_display_list)
+                        values (:catalog, :type, :field, :field_display, :field_display_list)
                     ");
 
                     if (!$sth->execute([
@@ -746,6 +749,7 @@
                         ":type" => $type,
                         ":field" => $field,
                         ":field_display" => $fieldDisplay,
+                        ":field_display_list" => $fieldDisplayList,
                     ])) {
                         return false;
                     }
@@ -963,7 +967,7 @@
              * @inheritDoc
              */
 
-            public function modifyCustomField($customFieldId, $catalog, $fieldDisplay, $fieldDescription, $regex, $format, $link, $options, $indx, $search, $required, $editor, $float, $readonly) {
+            public function modifyCustomField($customFieldId, $catalog, $fieldDisplay, $fieldDisplayList, $fieldDescription, $regex, $format, $link, $options, $indx, $search, $required, $editor, $float, $readonly) {
                 $this->clearCache();
 
                 if (!checkInt($customFieldId)) {
@@ -1005,6 +1009,7 @@
                         set
                             catalog = :catalog,
                             field_display = :field_display,
+                            field_display_list = :field_display_list,
                             field_description = :field_description,
                             regex = :regex,
                             link = :link,
@@ -1022,6 +1027,7 @@
                     $sth->execute([
                         ":catalog" => $catalog,
                         ":field_display" => $fieldDisplay,
+                        ":field_display_list" => $fieldDisplayList,
                         ":field_description" => $fieldDescription,
                         ":regex" => $regex,
                         ":link" => $link,

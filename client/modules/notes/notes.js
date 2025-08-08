@@ -75,9 +75,17 @@
             if (modules.notes.isDragging == 1) {
                 let off = cont.offset();
 
+                let gridSize = 10;
+
+                let newX = Math.max(-off.left + e.clientX - modules.notes.lastOffsetX, 0);
+                let newY = Math.max($("html").scrollTop() - off.top + e.clientY - modules.notes.lastOffsetY, 0);
+
+                newX = Math.round(newX / gridSize) * gridSize;
+                newY = Math.round(newY / gridSize) * gridSize;
+
                 modules.notes.dragTarget.css({
-                    left: -off.left + e.clientX - modules.notes.lastOffsetX + 'px',
-                    top: $("html").scrollTop() - off.top + e.clientY - modules.notes.lastOffsetY + 'px',
+                    left: newX + 'px',
+                    top: newY + 'px',
                 });
             }
 
@@ -303,7 +311,7 @@
                     id,
                     r.subject,
                     r.body,
-                    r.color,
+                    r.color ? ("text-" + r.color) : "",
                     r.icon,
                     r.font,
                     r.checks,
@@ -521,7 +529,8 @@
                     modules.notes.notes[id].remind = r.remind;
                     modules.notes.notes[id].icon = r.icon;
                     modules.notes.notes[id].font = r.font;
-                    modules.notes.notes[id].color = r.color;
+                    modules.notes.notes[id].color = r.color ? ("text-" + r.color) : "";
+
                     modules.notes.notes[id].x = parseFloat(x);
                     modules.notes.notes[id].y = parseFloat(y);
                     modules.notes.notes[id].z = parseInt(z);
@@ -665,7 +674,7 @@
             modules.notes.createNote();
         });
 
-        $("#mainForm").html(`<div style="overflow-x: scroll; overflow-y: hidden;" class="p-0 m-0 mt-3"><div id="stickiesContainer" style="position: relative;" class="p-0 m-0 resizable mouseEvents"></div></div>`);
+        $("#mainForm").html(`<div style="overflow-x: scroll; overflow-y: hidden;" class="p-0 m-0 mt-3"><div id="stickiesContainer" style="position: relative;" class="p-0 m-0 resizable mouseEvents dots"></div></div>`);
 
         let s = $("#stickiesContainer");
 
@@ -680,7 +689,7 @@
 
         let rtd = '';
 
-        rtd += '<form autocomplete="off"><div class="form-inline ml-3 mr-3"><div class="input-group input-group-sm mt-1"><select id="notesCategories" class="form-control select-arrow right-top-select"></select></div></div></form>';
+        rtd += '<form autocomplete="off"><div class="form-inline ml-3 mr-3"><div class="input-group input-group-sm mt-1"><select id="notesCategories" class="form-control select-arrow right-top-select top-input"></select></div></div></form>';
 
         $("#rightTopDynamic").html(rtd);
 

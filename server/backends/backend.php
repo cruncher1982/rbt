@@ -167,14 +167,14 @@
              * @return void
              */
 
-            public function cacheSet($key, $value) {
+            public function cacheSet($key, $value, $memOnly = false) {
                 $key = "CACHE:" . strtoupper($this->backend) . ":" . $key . ":" . $this->uid;
 
                 $value = json_encode($value);
 
                 if ($value != @$this->cache[$key]) {
                     $this->cache[$key] = $value;
-                    if ((int)$this->uid > 0) {
+                    if ((int)$this->uid > 0 && !$memOnly) {
                         $this->redis->setex($key, @$this->config["redis"]["backends_cache_ttl"] ? : ( 3 * 24 * 60 * 60 ), $value);
                     }
                 }

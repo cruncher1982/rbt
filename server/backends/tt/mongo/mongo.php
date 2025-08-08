@@ -31,7 +31,7 @@
 
                 require_once __DIR__ . '/../../../utils/clickhouse.php';
 
-                $this->dbName = @$config["backends"]["tt"]["db"]?:"tt";
+                $this->dbName = @$config["backends"]["tt"]["db"] ?: "tt";
 
                 if (@$config["mongo"]["uri"]) {
                     $this->mongo = new \MongoDB\Client($config["mongo"]["uri"]);
@@ -40,11 +40,11 @@
                 }
 
                 $this->clickhouse = new \clickhouse(
-                    @$config['clickhouse']['host']?:'127.0.0.1',
-                    @$config['clickhouse']['port']?:8123,
-                    @$config['clickhouse']['username']?:'default',
-                    @$config['clickhouse']['password']?:'qqq',
-                    @$config['clickhouse']['database']?:'default'
+                    @$config['clickhouse']['host'] ?: '127.0.0.1',
+                    @$config['clickhouse']['port'] ?: 8123,
+                    @$config['clickhouse']['username'] ?: 'default',
+                    @$config['clickhouse']['password'] ?: 'qqq',
+                    @$config['clickhouse']['database'] ?: 'default'
                 );
             }
 
@@ -237,7 +237,7 @@
                 }
 
                 if ($delete) {
-                    $childrens = $this->getIssues($acr, [ "parent" => $issueId ], [ "issueId" ], [ "created" => 1 ], 0, 32768);
+                    $childrens = $this->getIssues($acr, [ "parent" => $issueId ], [ "issueId" ], [], 0, 32768);
 
                     if ($childrens && count($childrens["issues"])) {
                         foreach ($childrens["issues"] as $children) {
@@ -335,7 +335,7 @@
                 return $types;
             }
 
-            private function getIssuesQuery($collection, $query, $fields = [], $sort = [ "created" => 1 ], $skip = 0, $limit = 100, $preprocess = [], $types = [], $byPipeline = false) {
+            private function getIssuesQuery($collection, $query, $fields = [], $sort = [], $skip = 0, $limit = 100, $preprocess = [], $types = [], $byPipeline = false) {
                 $me = $this->myRoles();
 
                 if (!@$me[$collection]) {
@@ -352,6 +352,8 @@
 
                 if ($users && $groups) {
                     $gl = $groups->getGroups();
+
+                    $users->getUser(-1);
 
                     foreach ($gl as $g) {
                         $gu = [];
@@ -390,7 +392,7 @@
              * @inheritDoc
              */
 
-            public function getIssues($collection, $query, $fields = [], $sort = [ "created" => 1 ], $skip = 0, $limit = 100, $preprocess = [], $types = [], $byPipeline = false) {
+            public function getIssues($collection, $query, $fields = [], $sort = [], $skip = 0, $limit = 100, $preprocess = [], $types = [], $byPipeline = false) {
                 $db = $this->dbName;
 
                 $query = $this->getIssuesQuery($collection, $query, $fields, $sort, $skip, $limit, $preprocess, $types, $byPipeline);
@@ -412,8 +414,6 @@
                 if (!$sort) {
                     $sort = [];
                 }
-
-                $sort["_id"] = -1;
 
                 foreach ($sort as $s => &$d) {
                     $d = (int)$d;
@@ -618,7 +618,7 @@
                     foreach ($indexes as $i) {
                         if (!in_array($i, $already)) {
                             try {
-                                $this->mongo->$db->$acr->createIndex([ $i => 1 ], [ "name" => "index_" . $i ]);
+                                $this->mongo->$db->$acr->createIndex([ $i => 1 ], [ "name" => "index_" . $i, "collation" => [ "locale" => @$this->config["language"] ? : "en", "strength" => 3 ] ]);
                                 $cnt++;
                             } catch (\Exception $e) {
                                 //
@@ -860,8 +860,11 @@
 
                 foreach ($attachments as $i => $attachment) {
                     $list = $files->searchFiles([ "metadata.issue" => true, "metadata.issueId" => $issueId, "filename" => $attachment["name"] ]);
+
                     if (count($list)) {
-                        return false;
+                        $f = pathinfo($attachment["name"]);
+                        $incr = $this->redis->incr("filedup");
+                        $attachments[$i]["name"] = $f["filename"] . "-dup-" . sprintf("%06d", $incr) . "." . $f["extension"];
                     }
 
                     if (@$attachment["body"]) {
@@ -1239,8 +1242,8 @@
              * @inheritDoc
              */
 
-            public function modifyCustomField($customFieldId, $catalog, $fieldDisplay, $fieldDescription, $regex, $format, $link, $options, $indx, $search, $required, $editor, $float, $readonly) {
-                $this->dbModifyCustomField($customFieldId, $catalog, $fieldDisplay, $fieldDescription, $regex, $format, $link, $options, $indx, $search, $required, $editor, $float, $readonly);
+            public function modifyCustomField($customFieldId, $catalog, $fieldDisplay, $fieldDisplayList, $fieldDescription, $regex, $format, $link, $options, $indx, $search, $required, $editor, $float, $readonly) {
+                $this->dbModifyCustomField($customFieldId, $catalog, $fieldDisplay, $fieldDisplayList, $fieldDescription, $regex, $format, $link, $options, $indx, $search, $required, $editor, $float, $readonly);
             }
 
             /**
@@ -1248,6 +1251,30 @@
              */
 
             public function journal($issueId, $action, $old, $new, $workflowAction) {
+
+                if (!function_exists('backends\tt\arrayRecursiveDiff')) {
+                    function arrayRecursiveDiff($array1, $array2) {
+                        $aReturn = [];
+
+                        foreach ($array1 as $index => $value) {
+                            if (array_key_exists($index, $array2)) {
+                                if (is_array($value) && is_array($array2[$index])) {
+                                    $recursiveDiff = arrayRecursiveDiff($value, $array2[$index]);
+                                    if ($recursiveDiff !== []) {
+                                        $aReturn[$index] = $recursiveDiff;
+                                    }
+                                } elseif ($value !== $array2[$index]) {
+                                    $aReturn[$index] = $value;
+                                }
+                            } else {
+                                $aReturn[$index] = $value;
+                            }
+                        }
+
+                        return $aReturn;
+                    }
+                }
+
                 if ($old && $new) {
                     $keys = [];
                     foreach ($old as $key => $field) {
@@ -1278,7 +1305,7 @@
                                 }
                             }
 
-                            if (!count(@array_diff($o, $n)) && !count(@array_diff($n, $o))) {
+                            if (!count(@arrayRecursiveDiff($o, $n)) && !count(@arrayRecursiveDiff($n, $o))) {
                                 unset($old[$key]);
                                 unset($new[$key]);
                             }
@@ -1399,7 +1426,7 @@
                     }
 
                     if (isset($filter["filter"])) {
-                        $query = json_decode(json_encode($this->getIssuesQuery($project, @$filter["filter"], [ "issueId" ], [ "created" => 1 ], 0, 1), true));
+                        $query = json_decode(json_encode($this->getIssuesQuery($project, @$filter["filter"], [ "issueId" ], [], 0, 1), true));
                     }
 
                     if ($query) {
@@ -1575,7 +1602,7 @@
 
 
                     try {
-                        $this->mongo->$db->$acr->createIndex($index, [ "name" => "manual_index" . $indexName ]);
+                        $this->mongo->$db->$acr->createIndex($index, [ "name" => "manual_index" . $indexName, "collation" => [ "locale" => @$this->config["language"] ? : "en" ]  ]);
                         $c++;
                     } catch (\Exception $e) {
                         //

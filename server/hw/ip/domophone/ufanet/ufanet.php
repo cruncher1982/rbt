@@ -4,19 +4,30 @@ namespace hw\ip\domophone\ufanet;
 
 use CURLFile;
 use Generator;
+use hw\Interface\{
+    DisplayTextInterface,
+    FreePassInterface,
+    GateModeInterface,
+    LanguageInterface,
+};
 use hw\ip\domophone\domophone;
 
 /**
  * Abstract class representing an Ufanet intercom.
  */
-abstract class ufanet extends domophone
+abstract class ufanet extends domophone implements
+    DisplayTextInterface,
+    FreePassInterface,
+    GateModeInterface,
+    LanguageInterface
 {
-
     use \hw\ip\common\ufanet\ufanet {
         transformDbConfig as protected commonTransformDbConfig;
     }
 
-    /** @var array Set of parameters sent to the intercom for different CMS models. */
+    /**
+     * @var array Set of parameters sent to the intercom for different CMS models.
+     */
     protected const CMS_PARAMS = [
         'BK-100' => ['type' => 'VIZIT', 'mode' => 2], // TODO: check mode 1 and mode 2
         'BK-400' => ['type' => 'VIZIT', 'mode' => 3],
@@ -37,28 +48,56 @@ abstract class ufanet extends domophone
     ];
 
     protected const PERSONAL_CODE_RFID_DATA_REGEXP = '/^(\d+);3$/';
+    protected const LINE_TEST_DURATION = 2;
 
-    /** @var array|null $dialplans An array that holds dialplan information, which may be null if not loaded. */
+    /**
+     * @var array|null $dialplans An array that holds dialplan information, which may be null if not loaded.
+     */
     protected ?array $dialplans = null;
 
-    /** @var array|null $rfids An array that holds RFID codes information, which may be null if not loaded. */
-    protected ?array $rfids = null;
+    /**
+     * @var array|null $keys An array that holds keys (RFID, personal code, BLE) information,
+     * which may be null if not loaded.
+     */
+    protected ?array $keys = null;
 
     protected ?string $cmsModelName = null;
 
+    /**
+     * @return array{index:string,value:array}
+     */
+    protected static function getMatrixCell(int $mapping, int $apartment): array
+    {
+        $hundreds = floor($mapping / 100);
+        $tens = floor(($mapping - $hundreds * 100) / 10);
+        $units = $mapping - ($hundreds * 100 + $tens * 10);
+
+        $index = "$hundreds$tens$units";
+
+        return [
+            'index' => $index,
+            'value' => [
+                'hundreds' => $hundreds,
+                'tens' => $tens,
+                'units' => $units,
+                'apartment' => $apartment,
+            ],
+        ];
+    }
+
     public function addRfid(string $code, int $apartment = 0, int $type = 1): void
     {
-        $this->loadRfids();
+        $this->loadKeys();
 
         $rfidData = "$apartment;$type";
 
         if ($type === 3) {
-            $this->rfids[substr($code, -5)] = $rfidData;
+            $this->keys[substr($code, -5)] = $rfidData;
             return;
         }
 
         $normalizedRfid = substr(strtolower($code), 6);
-        $this->rfids[$normalizedRfid] = $rfidData;
+        $this->keys[$normalizedRfid] = $rfidData;
     }
 
     public function addRfids(array $rfids): void
@@ -73,7 +112,7 @@ abstract class ufanet extends domophone
         int   $code = 0,
         array $sipNumbers = [],
         bool  $cmsEnabled = true,
-        array $cmsLevels = []
+        array $cmsLevels = [],
     ): void
     {
         $this->loadDialplans();
@@ -127,20 +166,6 @@ abstract class ufanet extends domophone
         ]);
     }
 
-    public function configureGate(array $links = []): void
-    {
-        if (empty($links)) {
-            return;
-        }
-
-        $this->apiCall('/api/v1/configuration', 'PATCH', [
-            'commutator' => [
-                'type' => 'GATE',
-                'mode' => 1,
-            ],
-        ]);
-    }
-
     public function configureMatrix(array $matrix): void
     {
         $remappedMatrix = $this->remapMatrix($matrix);
@@ -166,7 +191,7 @@ abstract class ufanet extends domophone
         int    $port = 5060,
         bool   $stunEnabled = false,
         string $stunServer = '',
-        int    $stunPort = 3478
+        int    $stunPort = 3478,
     ): void
     {
         $this->apiCall('/api/v1/configuration', 'PATCH', [
@@ -203,21 +228,48 @@ abstract class ufanet extends domophone
 
     public function deleteRfid(string $code = ''): void
     {
-        $this->loadRfids();
+        $this->loadKeys();
 
         if ($code === '') {
-            $this->rfids = [];
+            $this->keys = [];
         } else {
             $lowercaseCode = strtolower($code);
             $normalizedRfid = substr($lowercaseCode, 6);
             $personalEntryCode = substr($lowercaseCode, -5);
-            unset($this->rfids[$normalizedRfid], $this->rfids[$personalEntryCode]);
+            unset($this->keys[$normalizedRfid], $this->keys[$personalEntryCode]);
         }
+    }
+
+    public function getDisplayText(): array
+    {
+        return array_filter($this->apiCall('/api/v1/configuration')['display']['labels'] ?? []);
+    }
+
+    public function getDisplayTextLinesCount(): int
+    {
+        return 3;
     }
 
     public function getLineDiagnostics(int $apartment): string|int|float
     {
-        return 0;
+        $url = "/api/v1/apartments/$apartment/test";
+
+        $this->apiCall($url, 'POST'); // Start test
+        sleep(self::LINE_TEST_DURATION); // Wait test
+        $resultRaw = $this->apiCall($url); // Get result
+
+        return $resultRaw['result'] ?? '';
+    }
+
+    public function isFreePassEnabled(): bool
+    {
+        return $this->apiCall('/api/v1/configuration')['door']['unlock'] !== '';
+    }
+
+    public function isGateModeEnabled(): bool
+    {
+        ['type' => $type, 'mode' => $mode] = $this->apiCall('/api/v1/configuration')['commutator'];
+        return $type === 'GATE' && $mode === 1;
     }
 
     public function openLock(int $lockNumber = 0): void
@@ -249,12 +301,7 @@ abstract class ufanet extends domophone
 
     public function setCallTimeout(int $timeout): void
     {
-        // Empty implementation
-    }
-
-    public function setCmsLevels(array $levels): void
-    {
-        // Empty implementation
+        $this->apiCall('/api/v1/configuration', 'PATCH', ['commutator' => ['calltime' => $timeout]]);
     }
 
     public function setCmsModel(string $model = ''): void
@@ -274,11 +321,24 @@ abstract class ufanet extends domophone
         ];
     }
 
+    public function setDisplayText(array $textLines): void
+    {
+        $this->apiCall('/api/v1/configuration', 'PATCH', [
+            'display' => [
+                'labels' => [
+                    $textLines[0] ?? '',
+                    $textLines[1] ?? '',
+                    $textLines[2] ?? '',
+                ],
+            ],
+        ]);
+    }
+
     public function setDtmfCodes(
         string $code1 = '1',
         string $code2 = '2',
         string $code3 = '3',
-        string $codeCms = '1'
+        string $codeCms = '1',
     ): void
     {
         $this->apiCall('/api/v1/configuration', 'PATCH', [
@@ -289,9 +349,33 @@ abstract class ufanet extends domophone
         ]);
     }
 
-    public function setLanguage(string $language = 'ru'): void
+    public function setFreePassEnabled(bool $enabled): void
     {
-        // Empty implementation
+        $this->apiCall('/api/v1/configuration', 'PATCH', [
+            'door' => [
+                'unlock' => $enabled ? '3000-01-01 00:00:00' : '',
+            ],
+        ]);
+    }
+
+    // TODO: need to set some CMS as default, otherwise there will be difference after disabling gate mode
+    public function setGateModeEnabled(bool $enabled): void
+    {
+        if ($enabled === false) {
+            return;
+        }
+
+        $this->apiCall('/api/v1/configuration', 'PATCH', [
+            'commutator' => [
+                'type' => 'GATE',
+                'mode' => 1,
+            ],
+        ]);
+    }
+
+    public function setLanguage(string $language): void
+    {
+        // TODO: Implement setLanguage() method.
     }
 
     public function setPublicCode(int $code = 0): void
@@ -316,23 +400,9 @@ abstract class ufanet extends domophone
         // Empty implementation
     }
 
-    public function setTickerText(string $text = ''): void
-    {
-        $this->apiCall('/api/v1/configuration', 'PATCH', ['display' => ['labels' => [$text, '', '']]]);
-    }
-
     public function setUnlockTime(int $time = 3): void
     {
         $this->apiCall('/api/v1/configuration', 'PATCH', ['door' => ['open_time' => $time]]);
-    }
-
-    public function setUnlocked(bool $unlocked = true): void
-    {
-        $this->apiCall('/api/v1/configuration', 'PATCH', [
-            'door' => [
-                'unlock' => $unlocked ? '3000-01-01 00:00:00' : '',
-            ],
-        ]);
     }
 
     public function syncData(): void
@@ -366,24 +436,20 @@ abstract class ufanet extends domophone
             $apartment['cmsLevels'] = [];
         }
 
-        if (!empty($dbConfig['gateLinks'])) {
-            unset($dbConfig['gateLinks']);
-
-            $dbConfig['gateLinks'][] = [
-                'address' => '',
-                'prefix' => 0,
-                'firstFlat' => 1,
-                'lastFlat' => 1,
-            ];
-        }
-
         return $dbConfig;
+    }
+
+    protected function cleanupApartmentPersonalCodes(int $apartment): void
+    {
+        $this->keys = array_filter($this->keys, function (string $data) use ($apartment) {
+            return "$apartment;3" != $data;
+        });
     }
 
     protected function getApartments(): array
     {
         $this->loadDialplans();
-        $this->loadRfids();
+        $this->loadKeys();
 
         $apartments = [];
 
@@ -394,7 +460,7 @@ abstract class ufanet extends domophone
 
             // The Ufanet intercom stores personal entry codes as keys. Restore structure that configurator expects
             $currentCode = 0;
-            foreach ($this->rfids as $code => $data) {
+            foreach ($this->keys as $code => $data) {
                 if (preg_match(self::PERSONAL_CODE_RFID_DATA_REGEXP, $data, $matches)) {
                     if ($matches[1] == $apartmentNumber) {
                         // Force SmartConfigurator to reconfigure apartment if somehow multiple personal codes exists
@@ -420,15 +486,20 @@ abstract class ufanet extends domophone
         return $apartments;
     }
 
+    /** @return Generator<int, array> */
+    protected function getApartmentsDialplans(bool $unmapped = false): Generator
+    {
+        foreach ($this->dialplans as $apartment => $dialplan) {
+            if (ctype_digit((string)$apartment) && ($dialplan['map'] != 0 || $unmapped)) {
+                yield (int)$apartment => $dialplan;
+            }
+        }
+    }
+
     protected function getAudioLevels(): array
     {
         $volume = $this->apiCall('/api/v1/configuration')['volume'];
         return [$volume['speaker'], $volume['mic']];
-    }
-
-    protected function getCmsLevels(): array
-    {
-        return [];
     }
 
     protected function getCmsModel(): string
@@ -464,22 +535,6 @@ abstract class ufanet extends domophone
         ];
     }
 
-    protected function getGateConfig(): array
-    {
-        ['type' => $type, 'mode' => $mode] = $this->apiCall('/api/v1/configuration')['commutator'];
-
-        if ($type === 'GATE' && $mode === 1) {
-            return [[
-                'address' => '',
-                'prefix' => 0,
-                'firstFlat' => 1,
-                'lastFlat' => 1,
-            ]];
-        }
-
-        return [];
-    }
-
     protected function getMatrix(): array
     {
         $this->loadDialplans();
@@ -497,48 +552,23 @@ abstract class ufanet extends domophone
         return $matrix;
     }
 
-    protected function getRfids(): array
+    protected function getMatrixEdge(): ?int
     {
-        $this->loadRfids();
-
-        $uniqueRfids = [];
-
-        // Get RFIDs and remove leading zeros
-        $normalizedRfids = [];
-        foreach ($this->rfids as $rfid => $data) {
-            $normalizedRfids[ltrim($rfid, '0')] = $data;
-        }
-
-        // Identify unique RFIDs
-        foreach ($normalizedRfids as $rfid => $data) {
-            // Skip personal codes
-            if (preg_match(self::PERSONAL_CODE_RFID_DATA_REGEXP, $data)) {
-                continue;
-            }
-
-            $isUnique = true;
-
-            foreach ($normalizedRfids as $compareRfid) {
-                if ($rfid !== $compareRfid && str_contains($compareRfid, $rfid)) {
-                    $isUnique = false;
-                    break;
-                }
-            }
-
-            if ($isUnique) {
-                $uniqueRfids[] = $rfid;
-            }
-        }
-
-        // Convert RFIDs to uppercase and pad them with leading zeros
-        return array_map(fn($rfid) => str_pad(strtoupper($rfid), 14, '0', STR_PAD_LEFT), $uniqueRfids);
+        return self::CMS_PARAMS[$this->cmsModelName]['edge'] ?? null;
     }
 
-    protected function cleanupApartmentPersonalCodes(int $apartment): void
+    protected function getRfids(): array
     {
-        $this->rfids = array_filter($this->rfids, function (string $data) use ($apartment) {
-            return "$apartment;3" != $data;
-        });
+        $this->loadKeys();
+
+        $rfidsRaw = array_keys(
+            KeyFilter::byType($this->keys, KeyType::RfidPersonal),
+        );
+
+        return array_map(
+            fn(string $rfid) => str_pad(strtoupper($rfid), 14, '0', STR_PAD_LEFT),
+            $rfidsRaw,
+        );
     }
 
     protected function getSipConfig(): array
@@ -562,16 +592,6 @@ abstract class ufanet extends domophone
         ];
     }
 
-    protected function getTickerText(): string
-    {
-        return $this->apiCall('/api/v1/configuration')['display']['labels'][0] ?? '';
-    }
-
-    protected function getUnlocked(): bool
-    {
-        return $this->apiCall('/api/v1/configuration')['door']['unlock'] !== '';
-    }
-
     /**
      * Load and cache dialplans from the API if they haven't been loaded already.
      *
@@ -585,15 +605,40 @@ abstract class ufanet extends domophone
     }
 
     /**
-     * Load and cache RFID codes from the API if they haven't been loaded already.
+     * Load and cache keys (RFID, personal code, BLE) from the API if they haven't been loaded already.
      *
      * @return void
      */
-    protected function loadRfids(): void
+    protected function loadKeys(): void
     {
-        if ($this->rfids === null) {
-            $this->rfids = $this->apiCall('/api/v1/rfids') ?? [];
+        if ($this->keys === null) {
+            $this->keys = $this->apiCall('/api/v1/rfids') ?? [];
         }
+    }
+
+    protected function remapMatrix(array $matrix, array $configApartments = []): array
+    {
+        $this->loadDialplans();
+
+        $newMatrix = [];
+        $edge = $this->getMatrixEdge();
+        foreach ($matrix as $index => $cell) {
+            $apartment = $cell['apartment'];
+            if (!isset($this->dialplans[$apartment]) && !isset($configApartments[$apartment])) {
+                continue;
+            }
+
+            $mapping = $cell['hundreds'] * 100 + $cell['tens'] * 10 + $cell['units'];
+            if ($edge && $mapping % $edge !== 0) {
+                $newMatrix[$index] = $cell;
+                continue;
+            }
+
+            $newCell = self::getMatrixCell($mapping + $edge, $apartment);
+            $newMatrix[$newCell['index']] = $newCell['value'];
+        }
+
+        return $newMatrix;
     }
 
     /**
@@ -614,7 +659,7 @@ abstract class ufanet extends domophone
         ];
 
         // Set cross numbering mode for CMS if device is not in gate mode
-        if (empty($this->getGateConfig()) && $this->getCmsModel() !== 'BK-400') {
+        if ($this->isGateModeEnabled() === false && $this->getCmsModel() !== 'BK-400') {
             $isCrossNumbering = $minApartmentNumber !== $maxApartmentNumber &&
                 intdiv($minApartmentNumber, 100) !== intdiv($maxApartmentNumber - 1, 100);
 
@@ -622,6 +667,27 @@ abstract class ufanet extends domophone
         }
 
         $this->apiCall('/api/v1/configuration', 'PATCH', ['commutator' => $params]);
+    }
+
+    /**
+     * Upload and set display image.
+     *
+     * @param string|null $pathToImage (Optional) Path to the image which will be uploaded.
+     * If null, the default path will be used.
+     * @return void
+     */
+    protected function setDisplayImage(?string $pathToImage = null): void
+    {
+        if ($pathToImage === null) {
+            $pathToImage = __DIR__ . '/assets/display_image.jpg';
+        }
+
+        if (!file_exists($pathToImage) || !is_file($pathToImage)) {
+            return;
+        }
+
+        sleep(15); // Yes...
+        $this->apiCall('/api/v1/file', 'POST', ['IMAGE' => new CURLFile($pathToImage)]);
     }
 
     /**
@@ -669,30 +735,12 @@ abstract class ufanet extends domophone
                     'FRSI_CONNECT' => 'FRSI: ГОВОРИТЕ',
                     'FRSI_CALL_COMPLETE' => 'FRSI: ВЫЗОВ ЗАВЕРШЁН',
                     'FRSI_ERROR' => 'FRSI: ОШИБКА',
+                    'ALARM_TEXT_1' => 'ТРЕВОГА 1',
+                    'ALARM_TEXT_2' => 'ТРЕВОГА 2',
+                    'ALARM_TEXT_3' => 'ТРЕВОГА 3',
                 ],
             ],
         ]);
-    }
-
-    /**
-     * Upload and set display image.
-     *
-     * @param string|null $pathToImage (Optional) Path to the image which will be uploaded.
-     * If null, the default path will be used.
-     * @return void
-     */
-    protected function setDisplayImage(?string $pathToImage = null): void
-    {
-        if ($pathToImage === null) {
-            $pathToImage = __DIR__ . '/assets/display_image.jpg';
-        }
-
-        if (!file_exists($pathToImage) || !is_file($pathToImage)) {
-            return;
-        }
-
-        sleep(15); // Yes...
-        $this->apiCall('/api/v1/file', 'POST', ['IMAGE' => new CURLFile($pathToImage)]);
     }
 
     /**
@@ -738,68 +786,8 @@ abstract class ufanet extends domophone
      */
     protected function uploadRfids(): void
     {
-        if ($this->rfids !== null) {
-            $this->apiCall('/api/v1/rfids', 'PUT', $this->rfids);
+        if ($this->keys !== null) {
+            $this->apiCall('/api/v1/rfids', 'PUT', $this->keys);
         }
-    }
-
-    protected function getMatrixEdge(): ?int
-    {
-        return self::CMS_PARAMS[$this->cmsModelName]['edge'] ?? null;
-    }
-
-    /** @return Generator<int, array> */
-    protected function getApartmentsDialplans(bool $unmapped = false): Generator
-    {
-        foreach ($this->dialplans as $apartment => $dialplan) {
-            if (ctype_digit((string)$apartment) && ($dialplan['map'] != 0 || $unmapped)) {
-                yield (int)$apartment => $dialplan;
-            }
-        }
-    }
-
-    protected function remapMatrix(array $matrix, array $configApartments = []): array
-    {
-        $this->loadDialplans();
-
-        $newMatrix = [];
-        $edge = $this->getMatrixEdge();
-        foreach ($matrix as $index => $cell) {
-            $apartment = $cell['apartment'];
-            if (!isset($this->dialplans[$apartment]) && !isset($configApartments[$apartment])) {
-                continue;
-            }
-
-            $mapping = $cell['hundreds'] * 100 + $cell['tens'] * 10 + $cell['units'];
-            if ($edge && $mapping % $edge !== 0) {
-                $newMatrix[$index] = $cell;
-                continue;
-            }
-
-            $newCell = self::getMatrixCell($mapping + $edge, $apartment);
-            $newMatrix[$newCell['index']] = $newCell['value'];
-        }
-
-        return $newMatrix;
-    }
-
-    /** @return array{index:string,value:array} */
-    protected static function getMatrixCell(int $mapping, int $apartment): array
-    {
-        $hundreds = floor($mapping / 100);
-        $tens = floor(($mapping - $hundreds * 100) / 10);
-        $units = $mapping - ($hundreds * 100 + $tens * 10);
-
-        $index = "$hundreds$tens$units";
-
-        return [
-            'index' => $index,
-            'value' => [
-                'hundreds' => $hundreds,
-                'tens' => $tens,
-                'units' => $units,
-                'apartment' => $apartment,
-            ]
-        ];
     }
 }

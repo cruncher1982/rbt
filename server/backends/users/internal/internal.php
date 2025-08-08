@@ -12,7 +12,15 @@
 
         class internal extends users {
 
-            private $logins, $users;
+            private $logins, $users, $pc = false;
+
+            /**
+             * @inheritDoc
+             */
+
+            function __construct($config, $db, $redis, $login = false) {
+                parent::__construct($config, $db, $redis, $login);
+            }
 
             /**
              * @inheritDoc
@@ -119,7 +127,11 @@
 
                 $cache = $this->cacheGet($key);
                 if ($cache) {
-                    $this->users[$key] = $cache;
+                    if ($uid >= 0) {
+                        $this->users[$key] = $cache;
+                    } else {
+                        $this->users = $cache;
+                    }
                     return $cache;
                 }
 
@@ -163,7 +175,7 @@
                                 $_user["persistentToken"] = $persistent;
                             }
 
-                            $this->cacheSet($key, $_user);
+                            $this->cacheSet($key, $_user, true);
                             $this->users[$key] = $_user;
 
                             return $_user;
@@ -177,6 +189,12 @@
                         return false;
                     }
                 } else {
+                    if ($this->pc) {
+                        return;
+                    }
+
+                    $this->pc = true;
+
                     // force fill memory cache
                     try {
                         $users = $this->db->queryEx("select uid, login, real_name, e_mail, phone, tg, notification, enabled, default_route, primary_group, acronym primary_group_acronym, secret from core_users left join core_groups on core_users.primary_group = core_groups.gid");
@@ -218,6 +236,8 @@
 
                             $this->users["USER:" . (int)$users[$i]["uid"] . ":" . (int)$withGroups] = $_user;
                         }
+
+                        $this->cacheSet($key, $this->users);
 
                         return true;
                     } catch (\Exception $e) {
@@ -449,12 +469,12 @@
              * @inheritDoc
              */
 
-             function getLoginByUid($uid) {
-                if ($this->users[$uid]) {
+            function getLoginByUid($uid) {
+                if (@$this->users[$uid]) {
                     return $this->users[$uid]["login"];
                 }
 
-                if ($this->logins[$uid]) {
+                if (@$this->logins[$uid]) {
                     return $this->logins[$uid] = $login;
                 }
 
@@ -467,6 +487,7 @@
                         "fieldlify"
                     ]
                 );
+
                 $this->logins[$uid] = $login;
             }
 
@@ -505,8 +526,7 @@
              * @inheritDoc
              */
 
-            public function getUidByLogin($login)
-            {
+            public function getUidByLogin($login) {
                 $key = "UIDBYLOGIN:$login";
 
                 $cache = $this->cacheGet($key);
@@ -548,7 +568,7 @@
                 }
             }
 
-             /**
+            /**
               * @inheritDoc
               */
 
@@ -579,7 +599,7 @@
              * @inheritDoc
              */
 
-             public function putAvatar($uid, $avatar) {
+            public function putAvatar($uid, $avatar) {
                 if (!checkInt($uid)) {
                     return false;
                 }
@@ -598,11 +618,11 @@
                 }
             }
 
-             /**
+            /**
               * @inheritDoc
               */
 
-             public function getAvatar($uid) {
+            public function getAvatar($uid) {
                 if ($this->uid != 0) {
                     $uid = $this->uid;
                 }

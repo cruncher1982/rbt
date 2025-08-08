@@ -696,10 +696,12 @@
              * @param $type
              * @param $field
              * @param $fieldDisplay
+             * @param $fieldDisplayList
+             *
              * @return false|integer
              */
 
-            abstract public function addCustomField($catalog, $type, $field, $fieldDisplay);
+            abstract public function addCustomField($catalog, $type, $field, $fieldDisplay, $fieldDisplayList);
 
             /**
              * @param $projectId
@@ -760,6 +762,7 @@
              * @param $customFieldId
              * @param $catalog
              * @param $fieldDisplay
+             * @param $fieldDisplayList
              * @param $fieldDescription
              * @param $regex
              * @param $format
@@ -775,7 +778,7 @@
              * @return boolean
              */
 
-            abstract public function modifyCustomField($customFieldId, $catalog, $fieldDisplay, $fieldDescription, $regex, $format, $link, $options, $indx, $search, $required, $editor, $float, $readonly);
+            abstract public function modifyCustomField($customFieldId, $catalog, $fieldDisplay, $fieldDisplayList, $fieldDescription, $regex, $format, $link, $options, $indx, $search, $required, $editor, $float, $readonly);
 
             /**
              * @param $customFieldId
@@ -822,38 +825,6 @@
              */
 
             public function getFilters() {
-                $files = loadBackend("files");
-
-                if (!$files) {
-                    $this->unCache("FILTERS");
-                    return false;
-                }
-
-                $cache = $this->cacheGet("FILTERS");
-                if ($cache) {
-                    return $cache;
-                }
-
-                $filters = $files->searchFiles([ "metadata.type" => "filter" ]);
-
-                $_list = [];
-                foreach ($filters as $filter) {
-                    try {
-                        $_list[$filter["metadata"]["filter"]] = @json_decode($this->getFilter($filter["metadata"]["filter"]), true)["name"] ? : $filter["metadata"]["filter"];
-                    } catch (\Exception $e) {
-                        $_list[$filter["metadata"]["filter"]] = $filter["metadata"]["filter"];
-                    }
-                }
-
-                $this->cacheSet("FILTERS", $_list);
-                return $_list;
-            }
-
-            /**
-             * @return false|array
-             */
-
-            public function getFiltersExt() {
                 $files = loadBackend("files");
 
                 if (!$files) {
@@ -1625,30 +1596,34 @@
              */
 
             public function preprocessFilter($query, $params, $types) {
-                if ($query) {
-                    array_walk_recursive($query, function (&$item, $key, $params) use ($types) {
-                        if (array_key_exists($item, $params)) {
-                            if (@$types[$item]) {
-                                $cast = $types[$item];
-                            } else {
-                                $cast = false;
+                if (!is_array($query)) {
+                    error_log(print_r($query, true));
+                } else {
+                    if ($query) {
+                        array_walk_recursive($query, function (&$item, $key, $params) use ($types) {
+                            if (array_key_exists($item, $params)) {
+                                if (@$types[$item]) {
+                                    $cast = $types[$item];
+                                } else {
+                                    $cast = false;
+                                }
+                                if (is_callable($params[$item])) {
+                                    $item = $params[$item]();
+                                } else {
+                                    $item = $params[$item];
+                                }
+                                if ($cast) {
+                                    if ($cast == "date") {
+                                        $item = date("Y-m-d", (int)$item);
+                                    } else
+                                    settype($item, $cast);
+                                }
                             }
-                            if (is_callable($params[$item])) {
-                                $item = $params[$item]();
-                            } else {
-                                $item = $params[$item];
-                            }
-                            if ($cast) {
-                                if ($cast == "date") {
-                                    $item = date("Y-m-d", (int)$item);
-                                } else
-                                settype($item, $cast);
-                            }
-                        }
-                    }, $params);
-                }
+                        }, $params);
+                    }
 
-                return $query;
+                    return $query;
+                }
             }
 
             /**
@@ -1658,6 +1633,16 @@
              */
 
             public function linkIssues($issue1, $issue2) {
+                if (gettype($issue2) == "array") {
+                    $success = true;
+
+                    foreach ($issue2 as $is2) {
+                        $success = $success && $this->linkIssues($issue1, $is2);
+                    }
+
+                    return $success;
+                }
+
                 $issue1 = $this->getIssue($issue1);
                 if (!$issue1) {
                     setLastError("issue1NotFound");

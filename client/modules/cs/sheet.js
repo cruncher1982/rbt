@@ -16,7 +16,7 @@
             let height = $(window).height() - mainFormTop;
             let h = '';
             h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
-            h += `<pre class="ace-editor mt-2" id="sheetEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+            h += `<pre class="ace-editor mt-2" id="sheetEditor"></pre>`;
             h += "</div>";
             h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="sheetSave" class="hoverable saveButton"><i class="fas fa-save pr-2"></i>${i18n("cs.sheetSave")}</span></span>`;
             $("#mainForm").html(h);
@@ -86,39 +86,35 @@
                     $("#sheetSave").click();
                 }),
             });
-/*
-            editor.getSession().on("changeAnnotation", function () {
-                let annot = editor.getSession().getAnnotations();
 
-                for (let key in annot) {
-                    if (annot.hasOwnProperty(key))
-                        console.log('"' + annot[key].text + '" on line: ' + annot[key].row);
-                    }
-            });
-*/
             $("#sheetSave").off("click").on("click", () => {
-                loadingStart();
                 let json;
+                let err;
                 try {
                     json = JSON.parse(editor.getValue());
-                } catch (_) {
-                    json = false;
+                } catch (e) {
+                    err = e.message;
                 }
-                let sheet = (json && json.sheet) ? json.sheet : params.sheet;
-                let date = (json && json.date) ? json.date : params.date;
-                PUT("cs", "sheet", false, {
-                    "sheet": sheet,
-                    "date": date,
-                    "data": $.trim(editor.getValue()),
-                }).
-                fail(FAIL).
-                done(() => {
-                    message(i18n("cs.sheetWasSaved"));
-                    currentAceEditorOriginalValue = currentAceEditor.getValue();
-                }).
-                always(() => {
-                    loadingDone();
-                });
+                if (!err) {
+                    loadingStart();
+                    let sheet = (json && json.sheet) ? json.sheet : params.sheet;
+                    let date = (json && json.date) ? json.date : params.date;
+                    PUT("cs", "sheet", false, {
+                        "sheet": sheet,
+                        "date": date,
+                        "data": $.trim(editor.getValue()),
+                    }).
+                    fail(FAIL).
+                    done(() => {
+                        message(i18n("cs.sheetWasSaved"));
+                        currentAceEditorOriginalValue = currentAceEditor.getValue();
+                    }).
+                    always(() => {
+                        loadingDone();
+                    });
+                } else {
+                    error(err, i18n("error"), 30);
+                }
             });
             loadingDone();
         });

@@ -1,3 +1,77 @@
+/**
+ * Generates and renders a dynamic modal or inline form with various field types, validation, and callbacks.
+ *
+ * @function
+ * @param {Object} params - Configuration object for the form.
+ * @param {string} [params.target] - Selector or DOM element to render the form into. If not provided, renders as a modal.
+ * @param {string} [params.size] - Modal size ('sm', 'lg', 'xl').
+ * @param {string} [params.title] - Title of the form/modal.
+ * @param {string} [params.apply] - Label for the apply/submit button.
+ * @param {boolean} [params.topApply] - If true, shows the apply button at the top.
+ * @param {boolean} [params.borderless] - If true, renders the table without borders.
+ * @param {boolean} [params.noHover] - If true, disables hover effect on table rows.
+ * @param {boolean} [params.singleColumn] - If true, renders the form in a single column layout.
+ * @param {boolean} [params.footer] - If true, renders a footer with action buttons.
+ * @param {boolean} [params.noFocus] - If true, disables autofocus on the first field.
+ * @param {number} [params.timeout] - Timeout in milliseconds to auto-close the modal.
+ * @param {string} [params.delete] - If provided, adds a delete confirmation select field.
+ * @param {string} [params.deleteTab] - Tab name for the delete field.
+ * @param {Function} [params.callback] - Callback function to be called with form values on successful submit.
+ * @param {Function} [params.cancel] - Callback function to be called on cancel.
+ * @param {Function} [params.tabActivate] - Callback function called when a tab is activated.
+ * @param {Function} [params.done] - Callback function called after the form is rendered.
+ * @param {Array<Object>} params.fields - Array of field configuration objects. Each field can have:
+ *   @param {string} fields[].id - Unique identifier for the field.
+ *   @param {string} [fields[].type] - Field type ('text', 'select', 'area', 'multiselect', 'sortable', 'files', 'jstree', etc.).
+ *   @param {string} [fields[].title] - Field label.
+ *   @param {string} [fields[].hint] - Hint or help text for the field.
+ *   @param {string} [fields[].tab] - Tab name for grouping fields.
+ *   @param {boolean} [fields[].hidden] - If true, hides the field.
+ *   @param {boolean} [fields[].readonly] - If true, makes the field read-only.
+ *   @param {boolean} [fields[].disabled] - If true, disables the field.
+ *   @param {boolean} [fields[].focus] - If true, autofocuses this field.
+ *   @param {any} [fields[].value] - Initial value for the field.
+ *   @param {Array<Object>} [fields[].options] - Options for select/multiselect fields.
+ *   @param {Function} [fields[].validate] - Validation function for the field. Should return true or an error string.
+ *   @param {Function} [fields[].select] - Callback for select field change.
+ *   @param {Object} [fields[].button] - Button configuration for fields with an attached button.
+ *   @param {Function} [fields[].add] - Callback for adding items (for jstree, etc.).
+ *   @param {Function} [fields[].rename] - Callback for renaming items (for jstree, etc.).
+ *   @param {Function} [fields[].delete] - Callback for deleting items (for jstree, etc.).
+ *   @param {Function} [fields[].search] - Callback for searching (for jstree, multiselect, etc.).
+ *   @param {Function} [fields[].renamed] - Callback for renamed event (for jstree).
+ *   @param {boolean} [fields[].autoload] - If true, auto-triggers file input (for files field).
+ *   @param {string} [fields[].placeholder] - Placeholder text for input fields.
+ *   @param {string} [fields[].pattern] - Regex pattern for input validation.
+ *   @param {number} [fields[].float] - Step value for number fields.
+ *   @param {string} [fields[].language] - Language for code editor fields.
+ *   @param {number} [fields[].height] - Height for code/json editor fields.
+ *   @param {boolean} [fields[].multiple] - If true, enables multiple selection (for select2).
+ *   @param {boolean} [fields[].tags] - If true, enables tag creation (for select2).
+ *   @param {Object} [fields[].ajax] - AJAX configuration for select2.
+ *   @param {number} [fields[].minimumResultsForSearch] - Minimum results to show search box (for select2).
+ *   @param {string} [fields[].color] - Color class for select2.
+ *   @param {string} [fields[].class] - Additional CSS class for the field.
+ *   @param {string} [fields[].icon] - Icon class for select2/icon fields.
+ *   @param {string} [fields[].font] - Font family for font fields.
+ *   @param {string} [fields[].state0] - Label for tristate option 0.
+ *   @param {string} [fields[].state1] - Label for tristate option 1.
+ *   @param {string} [fields[].state2] - Label for tristate option 2.
+ *   @param {Array<string>} [fields[].mimeTypes] - Allowed MIME types for files field.
+ *   @param {number} [fields[].maxSize] - Maximum file size for files field.
+ *   @param {boolean} [fields[].allButtons] - If false, hides check all/uncheck all buttons (for multiselect).
+ *   @param {boolean} [fields[].filter] - If true, enables filter input (for multiselect).
+ *   @param {boolean} [fields[].search] - If true, enables search input (for jstree).
+ *   @param {boolean} [fields[].addRoot] - If true, enables add root button (for jstree).
+ *   @param {boolean} [fields[].tabHidden] - If true, hides the field in the current tab.
+ *   @param {string} [fields[].return] - Return mode for date fields ('asis' or default).
+ *   @param {boolean} [fields[].sec] - If true, returns date as seconds, otherwise as milliseconds.
+ *   @param {boolean} [fields[].noHover] - If true, disables hover effect for the field row.
+ *   @param {boolean} [fields[].append] - Additional HTML to append to the field.
+ *
+ * @returns {jQuery|HTMLElement} The jQuery object or DOM element containing the rendered form.
+ */
+
 function cardForm(params) {
     try {
         queryLocalFonts().then(array => {
@@ -102,7 +176,7 @@ function cardForm(params) {
         }
     }
 
-    if (others && tabs.length && tabs.indexOf(i18n("other"))) {
+    if (others && tabs.length && tabs.indexOf(i18n("other")) < 0) {
         tabs.push(i18n("other"));
     }
 
@@ -161,6 +235,24 @@ function cardForm(params) {
             ];
         }
 
+        if (params.fields[i].type == "tristate") {
+            params.fields[i].type = "select";
+            params.fields[i].options = [
+                {
+                    id: "0",
+                    text: params.fields[i].state0,
+                },
+                {
+                    id: "1",
+                    text: params.fields[i].state1,
+                },
+                {
+                    id: "2",
+                    text: params.fields[i].state2,
+                },
+            ];
+        }
+
         if (params.fields[i].type == "font") {
             let fonts = [
                 {
@@ -185,63 +277,68 @@ function cardForm(params) {
             params.fields[i].type = "select2";
             params.fields[i].options = [
                 {
-                    text: "Warning",
-                    value: "bg-warning",
+                    text: i18n("byDefault"),
+                    value: "",
+                    icon: "p-1 fas fa-palette",
+                },
+                {
+                    text: i18n("colorWarning"),
+                    value: "warning",
                     icon: "p-1 fas fa-palette bg-warning",
                 },
                 {
-                    text: "Primary",
-                    value: "bg-primary",
+                    text: i18n("colorPrimary"),
+                    value: "primary",
                     icon: "p-1 fas fa-palette bg-primary",
                 },
                 {
-                    text: "Secondary",
-                    value: "bg-secondary",
+                    text: i18n("colorSecondary"),
+                    value: "secondary",
                     icon: "p-1 fas fa-palette bg-secondary",
                 },
                 {
-                    text: "Success",
-                    value: "bg-success",
+                    text: i18n("Success"),
+                    value: "success",
                     icon: "p-1 fas fa-palette bg-success",
                 },
                 {
-                    text: "Danger",
-                    value: "bg-danger",
+                    text: i18n("Danger"),
+                    value: "danger",
                     icon: "p-1 fas fa-palette bg-danger",
                 },
                 {
-                    text: "Info",
-                    value: "bg-info",
+                    text: i18n("Info"),
+                    value: "info",
                     icon: "p-1 fas fa-palette bg-info",
                 },
                 {
-                    text: "Purple",
-                    value: "bg-purple",
+                    text: i18n("Purple"),
+                    value: "purple",
                     icon: "p-1 fas fa-palette bg-purple",
                 },
                 {
-                    text: "Orange",
-                    value: "bg-orange",
+                    text: i18n("Orange"),
+                    value: "orange",
                     icon: "p-1 fas fa-palette bg-orange",
                 },
                 {
-                    text: "Lightblue",
-                    value: "bg-lightblue",
+                    text: i18n("Lightblue"),
+                    value: "lightblue",
                     icon: "p-1 fas fa-palette bg-lightblue",
                 },
                 {
-                    text: "Fuchsia",
-                    value: "bg-fuchsia",
+                    text: i18n("Fuchsia"),
+                    value: "fuchsia",
                     icon: "p-1 fas fa-palette bg-fuchsia",
                 },
                 {
-                    text: "Black",
-                    value: "bg-black",
+                    text: i18n("Black"),
+                    value: "black",
                     icon: "p-1 fas fa-palette bg-black",
                 },
                 {
-                    text: "Lime",
-                    value: "bg-lime",
+                    text: i18n("Lime"),
+                    value: "lime",
                     icon: "p-1 fas fa-palette bg-lime",
                 },
             ];
@@ -303,12 +400,12 @@ function cardForm(params) {
         }
 
         if (params.fields[i].hidden) {
-            h += `<tr style="display: none;">`;
+            h += `<tr style="display: none;" name="${_prefix}${params.fields[i].id}-container" id="${_prefix}${params.fields[i].id}-container">`;
         } else
         if (params.fields[i].tabHidden) {
-            h += `<tr style="display: none;" class="jsform-tabbed-item ${params.fields[i].noHover ? 'nohover' : ''}" data-tab-index='${tabs.indexOf(params.fields[i].tab)}'>`;
+            h += `<tr style="display: none;" class="jsform-tabbed-item ${params.fields[i].noHover ? 'nohover' : ''}" data-tab-index="${tabs.indexOf(params.fields[i].tab)}" name="${_prefix}${params.fields[i].id}-container" id="${_prefix}${params.fields[i].id}-container">`;
         } else {
-            h += `<tr class="jsform-tabbed-item ${params.fields[i].noHover ? 'nohover' : ''}" data-tab-index='${tabs.indexOf(params.fields[i].tab)}'>`;
+            h += `<tr class="jsform-tabbed-item ${params.fields[i].noHover ? 'nohover' : ''}" data-tab-index="${tabs.indexOf(params.fields[i].tab)}" name="${_prefix}${params.fields[i].id}-container" id="${_prefix}${params.fields[i].id}-container">`;
         }
 
         params.fields[i].type = params.fields[i].type ? params.fields[i].type : "text";
@@ -385,10 +482,105 @@ function cardForm(params) {
                 if (params.fields[i].readonly) {
                     h += `<span class="input-group-text disabled" disabled="disabled"><i class="fas fa-fw fa-angle-double-right"></i></span>`;
                 } else {
-                    h += `<span class="input-group-text pointer cardFormSelectWithRotate"><i class="fas fa-fw fa-angle-double-right"></i></span>`;
+                    h += `<span class="input-group-text pointer cardFormSelectWithRotate" data-for="${_prefix}${params.fields[i].id}"><i class="fas fa-fw fa-angle-double-right"></i></span>`;
                 }
                 h += `</div>`;
                 h += `</div>`;
+                break;
+
+            case "time":
+                if ($.browser.mozilla) {
+                    if (params.fields[i].button) {
+                        h += `<div class="input-group">`;
+                    }
+                    if (params.fields[i].type == "number") {
+                        let float = params.fields[i].float ? params.fields[i].float : "any";
+                        h += `<input name="${_prefix}${params.fields[i].id}" id="${_prefix}${params.fields[i].id}" type="${params.fields[i].type}" class="form-control modalFormField" style="cursor: text;" autocomplete="off" placeholder="${escapeHTML(params.fields[i].placeholder ? params.fields[i].placeholder : "")}" step="${float}"`;
+                    } else {
+                        h += `<input name="${_prefix}${params.fields[i].id}" id="${_prefix}${params.fields[i].id}" type="${params.fields[i].type}" class="form-control modalFormField" style="cursor: text;" autocomplete="off" placeholder="${escapeHTML(params.fields[i].placeholder ? params.fields[i].placeholder : "")}"`;
+                    }
+                    if (params.fields[i].readonly) {
+                        h += ` readonly="readonly"`;
+                        h += ` disabled="disabled"`;
+                    }
+                    if (params.fields[i].pattern) {
+                        h += ` pattern="${params.fields[i].pattern}"`;
+                    }
+                    h += ` />`;
+                    if (params.fields[i].button) {
+                        h += `<div class="input-group-append">`;
+                        h += `<span id="${_prefix}${params.fields[i].id}-button" title="${params.fields[i].button.hint ? params.fields[i].button.hint : ''}" class="input-group-text pointer"><i class="fa-fw ${params.fields[i].button.class}"></i></span>`;
+                        h += `</div>`;
+                        h += `</div>`;
+                    }
+                } else {
+                    h += `<div class="input-group">`;
+                    h += `<input name="${_prefix}${params.fields[i].id}" id="${_prefix}${params.fields[i].id}" type="${params.fields[i].type}" class="form-control modalFormField nopicker" style="cursor: text;" autocomplete="off" placeholder="${escapeHTML(params.fields[i].placeholder ? params.fields[i].placeholder : "")}"`;
+                    if (params.fields[i].readonly) {
+                        h += ` readonly="readonly"`;
+                        h += ` disabled="disabled"`;
+                    }
+                    if (params.fields[i].pattern) {
+                        h += ` pattern="${params.fields[i].pattern}"`;
+                    }
+                    h += ` />`;
+                    h += `<div class="input-group-append">`;
+                    if (params.fields[i].readonly) {
+                        h += `<span class="input-group-text disabled" disabled="disabled"><i class="far fa-fw fa-clock"></i></span>`;
+                    } else {
+                        h += `<span class="input-group-text pointer cardFormPicker" data-for="${_prefix}${params.fields[i].id}"><i class="far fa-fw fa-clock"></i></span>`;
+                    }
+                    h += `</div>`;
+                    h += `</div>`;
+                }
+                break;
+
+            case "date":
+            case "datetime-local":
+                if ($.browser.mozilla) {
+                    if (params.fields[i].button) {
+                        h += `<div class="input-group">`;
+                    }
+                    if (params.fields[i].type == "number") {
+                        let float = params.fields[i].float ? params.fields[i].float : "any";
+                        h += `<input name="${_prefix}${params.fields[i].id}" id="${_prefix}${params.fields[i].id}" type="${params.fields[i].type}" class="form-control modalFormField" style="cursor: text;" autocomplete="off" placeholder="${escapeHTML(params.fields[i].placeholder ? params.fields[i].placeholder : "")}" step="${float}"`;
+                    } else {
+                        h += `<input name="${_prefix}${params.fields[i].id}" id="${_prefix}${params.fields[i].id}" type="${params.fields[i].type}" class="form-control modalFormField" style="cursor: text;" autocomplete="off" placeholder="${escapeHTML(params.fields[i].placeholder ? params.fields[i].placeholder : "")}"`;
+                    }
+                    if (params.fields[i].readonly) {
+                        h += ` readonly="readonly"`;
+                        h += ` disabled="disabled"`;
+                    }
+                    if (params.fields[i].pattern) {
+                        h += ` pattern="${params.fields[i].pattern}"`;
+                    }
+                    h += ` />`;
+                    if (params.fields[i].button) {
+                        h += `<div class="input-group-append">`;
+                        h += `<span id="${_prefix}${params.fields[i].id}-button" title="${params.fields[i].button.hint ? params.fields[i].button.hint : ''}" class="input-group-text pointer"><i class="fa-fw ${params.fields[i].button.class}"></i></span>`;
+                        h += `</div>`;
+                        h += `</div>`;
+                    }
+                } else {
+                    h += `<div class="input-group">`;
+                    h += `<input name="${_prefix}${params.fields[i].id}" id="${_prefix}${params.fields[i].id}" type="${params.fields[i].type}" class="form-control modalFormField nopicker" style="cursor: text;" autocomplete="off" placeholder="${escapeHTML(params.fields[i].placeholder ? params.fields[i].placeholder : "")}"`;
+                    if (params.fields[i].readonly) {
+                        h += ` readonly="readonly"`;
+                        h += ` disabled="disabled"`;
+                    }
+                    if (params.fields[i].pattern) {
+                        h += ` pattern="${params.fields[i].pattern}"`;
+                    }
+                    h += ` />`;
+                    h += `<div class="input-group-append">`;
+                    if (params.fields[i].readonly) {
+                        h += `<span class="input-group-text disabled" disabled="disabled"><i class="far fa-fw fa-calendar"></i></span>`;
+                    } else {
+                        h += `<span class="input-group-text pointer cardFormPicker" data-for="${_prefix}${params.fields[i].id}"><i class="far fa-fw fa-calendar"></i></span>`;
+                    }
+                    h += `</div>`;
+                    h += `</div>`;
+                }
                 break;
 
             case "select2":
@@ -445,7 +637,7 @@ function cardForm(params) {
                     // TODO: Do something with this!!! (max-height)
                 }
                 for (let j = 0; j < params.fields[i].options.length; j++) {
-                    let id = md5(guid());
+                    let id = "id-" + md5(guid());
                     let c = params.fields[i].options[j].checked || (typeof params.fields[i].value === "object" && Array.isArray(params.fields[i].value) && params.fields[i].value.indexOf(params.fields[i].options[j].id) >= 0);
                     h += `
                         <div class="custom-control custom-checkbox${(j !== params.fields[i].options.length - 1) ? " mb-3" : ""}">
@@ -502,7 +694,7 @@ function cardForm(params) {
             case "json":
                 height = params.fields[i].height ? params.fields[i].height : 400;
                 h += `<div id="${_prefix}${params.fields[i].id}-div" style="height: ${height}px;">`;
-                h += `<pre class="ace-editor form-control modalFormField" id="${_prefix}${params.fields[i].id}" rows="5" style="border: 1px solid #ced4da; border-radius: 0.25rem;">`;
+                h += `<pre class="ace-editor form-control modalFormField" id="${_prefix}${params.fields[i].id}">`;
                 h += `</pre>`;
                 h += `</div>`;
                 break;
@@ -511,9 +703,6 @@ function cardForm(params) {
             case "email":
             case "number":
             case "tel":
-            case "date":
-            case "time":
-            case "datetime-local":
             case "password":
             case "color":
                 if (params.fields[i].button) {
@@ -532,7 +721,7 @@ function cardForm(params) {
                 if (params.fields[i].pattern) {
                     h += ` pattern="${params.fields[i].pattern}"`;
                 }
-                h += `>`;
+                h += ` />`;
                 if (params.fields[i].button) {
                     h += `<div class="input-group-append">`;
                     h += `<span id="${_prefix}${params.fields[i].id}-button" title="${params.fields[i].button.hint ? params.fields[i].button.hint : ''}" class="input-group-text pointer"><i class="fa-fw ${params.fields[i].button.class}"></i></span>`;
@@ -588,6 +777,14 @@ function cardForm(params) {
                     }
                     h += `</div>`;
                 }
+                break;
+
+            case "button":
+                h += `<input name="${_prefix}${params.fields[i].id}" id="${_prefix}${params.fields[i].id}" type="${params.fields[i].type}" value="${params.fields[i].button.hint}" class="btn ${params.fields[i].button.class ? params.fields[i].button.class : 'btn-secondary'}" />`;
+                break;
+
+            case "none":
+                h += params.fields[i].value ? ('<div style="height: 34px;">' + params.fields[i].value + '</div>') : '<div style="height: 34px;">&nbsp;</div>';
                 break;
         }
 
@@ -835,10 +1032,14 @@ function cardForm(params) {
         if (!params.delete || $(`#${_prefix}delete`).val() !== "yes") {
             for (let i in params.fields) {
                 if (params.fields[i].id === "-") continue;
-                if (params.fields[i].hidden) continue;
+                if (params.fields[i].hidden && $(`#${_prefix}${params.fields[i].id}-container`).attr("data-form-runtime-hide") !== "0") continue;
                 if (params.fields[i].validate && typeof params.fields[i].validate === "function") {
-                    if (!params.fields[i].validate(getVal(i), _prefix)) {
+                    let v = params.fields[i].validate(getVal(i), _prefix);
+                    if (v !== true) {
                         invalid.push(i);
+                        if (typeof v == "string") {
+                            error(v, i18n("invalidFieldValue"));
+                        }
                     }
                 }
             }
@@ -905,8 +1106,9 @@ function cardForm(params) {
     } else {
         target = modal(h);
 
+        $('#modal').attr("data-prefix", _prefix);
+
         if (params.timeout) {
-            $('#modal').attr("data-prefix", _prefix);
             setTimeout(() => {
                 if ($('#modal').attr("data-prefix") == _prefix) {
                     $('#modal').modal('hide');
@@ -946,7 +1148,7 @@ function cardForm(params) {
     $(".modalFormCancel").off("click").on("click", cancel);
 
     $(".cardFormSelectWithRotate").off("click").on("click", function () {
-        let select = $(this).parent().parent().children().first();
+        let select = $("#" + $(this).attr("data-for"));
         let i = parseInt(select.attr("data-field-index"));
         let val = select.val();
         let first = select.children().first();
@@ -969,6 +1171,11 @@ function cardForm(params) {
         if (typeof params.fields[i].select === "function") {
             params.fields[i].select(select, params.fields[i].id, _prefix);
         }
+    });
+
+    $(".cardFormPicker").off("click").on("click", function () {
+        let input = $(this).attr("data-for");
+        document.querySelector("#" + input).showPicker();
     });
 
     for (let i in params.fields) {
@@ -1014,9 +1221,15 @@ function cardForm(params) {
         }
 
         if (params.fields[i].button && typeof params.fields[i].button.click === "function") {
-            $(`#${_prefix}${params.fields[i].id}-button`).off("click").on("click", () => {
-                params.fields[i].button.click(_prefix);
-            });
+            if (params.fields[i].type == "button") {
+                $(`#${_prefix}${params.fields[i].id}`).off("click").on("click", () => {
+                    params.fields[i].button.click(_prefix);
+                });
+            } else {
+                $(`#${_prefix}${params.fields[i].id}-button`).off("click").on("click", () => {
+                    params.fields[i].button.click(_prefix);
+                });
+            }
         }
 
         if (params.fields[i].type == "select") {
@@ -1439,6 +1652,7 @@ function cardForm(params) {
         let i = parseInt($(this).attr("data-tab-index"));
         $(`.jsform-tabbed-item`).hide();
         $(`.jsform-tabbed-item[data-tab-index="${i}"]`).show();
+        $(`.jsform-tabbed-item[data-form-runtime-hide="1"]`).hide();
         $(`.jsform-nav-link`).removeClass("text-bold");
         $(`.jsform-nav-link[data-tab-index="${i}"]`).addClass("text-bold");
 

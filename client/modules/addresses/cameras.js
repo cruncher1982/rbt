@@ -185,7 +185,7 @@
                     title: i18n("addresses.timezone"),
                     placeholder: i18n("addresses.timezone"),
                     options: timezonesOptions(),
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     },
                     value: "-",
@@ -367,9 +367,20 @@
                 modules.addresses.cameras.map.setView([lat, lon], zoom);
                 modules.addresses.cameras.marker = L.marker([lat, lon], { draggable: true }).addTo(modules.addresses.cameras.map);
 
+                modules.addresses.cameras.map.addControl(new L.Control.Fullscreen({
+                    title: {
+                        'false': i18n("fullscreen"),
+                        'true': i18n("exitFullscreen"),
+                    }
+                }));
+
                 modules.addresses.cameras.marker.on('dragend', () => {
                     $("#" + prefix + "geo").val(modules.addresses.cameras.marker.getLatLng().lat + "," + modules.addresses.cameras.marker.getLatLng().lng);
                 });
+
+                if (config.map && config.map.hideAttribution) {
+                    $(".leaflet-control-attribution").hide();
+                }
             },
             tabActivate: function (prefix, tab) {
                 if (tab == i18n("addresses.map")) {
@@ -608,7 +619,7 @@
                         title: i18n("addresses.timezone"),
                         placeholder: i18n("addresses.timezone"),
                         options: timezonesOptions(),
-                        validate: (v) => {
+                        validate: v => {
                             return $.trim(v) !== "";
                         },
                         value: camera.timezone,
@@ -764,9 +775,20 @@
                     modules.addresses.cameras.map.setView([lat, lon], zoom);
                     modules.addresses.cameras.marker = L.marker([lat, lon], { draggable: true }).addTo(modules.addresses.cameras.map);
 
+                    modules.addresses.cameras.map.addControl(new L.Control.Fullscreen({
+                        title: {
+                            'false': i18n("fullscreen"),
+                            'true': i18n("exitFullscreen"),
+                        }
+                    }));
+
                     modules.addresses.cameras.marker.on('dragend', () => {
                         $("#" + prefix + "geo").val(modules.addresses.cameras.marker.getLatLng().lat + "," + modules.addresses.cameras.marker.getLatLng().lng);
                     });
+
+                    if (config.map && config.map.hideAttribution) {
+                        $(".leaflet-control-attribution").hide();
+                    }
 
                     let h = '';
                     h += `<div id="${prefix}md"></div>`;
@@ -983,7 +1005,7 @@
             case 'Disabled':
                 statusClass = 'status-disabled';
                 break;
-            case 'DVRerr':
+            case 'DVR error':
                 statusClass = 'status-dvr-err';
                 break;
             case 'Other':

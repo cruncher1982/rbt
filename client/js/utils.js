@@ -1,3 +1,13 @@
+const additionalLinks = [
+    "fb",
+    "vless",
+    "vmess",
+    "ss",
+    "tg",
+];
+
+var phoneUtil = libphonenumber.PhoneNumberUtil.getInstance();
+
 function isEmpty(v) {
     let f = !!v;
 
@@ -53,7 +63,8 @@ function trimStr(str, len, abbr) {
         if (abbr) {
             return "<abbr title='" + escapeHTML(str) + "'>" + str.substring(0, sub) + "..." + str.substring(str.length - sub) + "</abbr>";
         } else {
-            return str.substring(0, sub) + "..." + str.substring(str.length - sub);
+            return "<span title='" + escapeHTML(str) + "'>" + str.substring(0, sub) + "..." + str.substring(str.length - sub) + "</span>";
+//            return str.substring(0, sub) + "..." + str.substring(str.length - sub);
         }
     } else {
         return str;
@@ -208,13 +219,42 @@ function parseFloatEx(f, r) {
     }
 }
 
+function telify(input) {
+    let l = lStore("_lang");
+    if (!l) {
+        l = config.defaultLanguage;
+    }
+    if (!l) {
+        l = "ru";
+    }
+
+    return input.replaceAll(new RegExp(config.regExp.phone, 'g'), function(match) {
+        try {
+            let pre = '';
+            let post = '';
+            if (match[0] < '0' || match[0] > '9') {
+                pre = match[0];
+                match = match.substring(1);
+            }
+            if (match[match.length - 1] < '0' || match[match.length - 1] > '9') {
+                post = match[match.length - 1];
+                match = match.substring(0, match.length - 1);
+            }
+            let phoneObject = phoneUtil.parse(trim(match), l);
+            return pre + '<a href="tel:' + phoneUtil.format(phoneObject, libphonenumber.PhoneNumberFormat.E164) + '" target="_blank">' + phoneUtil.format(phoneObject, libphonenumber.PhoneNumberFormat.NATIONAL) + '</a>' + post;
+        } catch (e) {
+            return match;
+        }
+    });
+}
+
 function convertLinks(input) {
     // https://linkify.js.org/
     let options = {
         defaultProtocol: "https",
         target: "_blank",
     };
-    return linkifyHtml(input, options);
+    return linkifyHtml(telify(input), options);
 }
 
 function getMonthDifference(startDate, endDate) {
@@ -222,7 +262,7 @@ function getMonthDifference(startDate, endDate) {
 }
 
 function findBootstrapEnvironment() {
-    let envs = ['xs', 'sm', 'md', 'lg', 'xl'];
+    let envs = [ 'xs', 'sm', 'md', 'lg', 'xl' ];
 
     let el = document.createElement('div');
     document.body.appendChild(el);
@@ -373,6 +413,21 @@ function pathToObject(parent, path) {
     return result;
 }
 
+function ildc() {
+    let mw = 0;
+
+    $(".ildc").each(function () {
+        let w = parseInt($(this).css("width"), 10);
+        if (w > mw) {
+            mw = w
+        }
+    });
+
+    mw += "px"
+
+    $(".ildc").css("width", mw);
+}
+
 Object.defineProperty(Array.prototype, "assoc", {
     value: function (key, target, val) {
         let arr = this;
@@ -407,3 +462,9 @@ jQuery.fn.click2 = function(single_click_callback, double_click_callback, timeou
         });
     });
 }
+
+for (let i in additionalLinks) {
+    linkify.registerCustomProtocol(additionalLinks[i]);
+}
+
+linkify.init();

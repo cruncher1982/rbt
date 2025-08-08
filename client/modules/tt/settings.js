@@ -25,7 +25,7 @@
                     type: "text",
                     title: i18n("tt.projectProject"),
                     placeholder: i18n("tt.projectProject"),
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     }
                 },
@@ -57,7 +57,7 @@
                     type: "text",
                     title: i18n("tt.status"),
                     placeholder: i18n("tt.status"),
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     },
                 },
@@ -94,7 +94,7 @@
                     type: "text",
                     title: i18n("tt.resolution"),
                     placeholder: i18n("tt.resolution"),
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     }
                 },
@@ -193,9 +193,15 @@
                     type: "text",
                     title: i18n("tt.customFieldDisplay"),
                     placeholder: i18n("tt.customFieldDisplay"),
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     }
+                },
+                {
+                    id: "fieldDisplayList",
+                    type: "text",
+                    title: i18n("tt.customFieldDisplayList"),
+                    placeholder: i18n("tt.customFieldDisplayList"),
                 },
             ],
             callback: function (result) {
@@ -205,6 +211,7 @@
                     type: result.type,
                     field: result.field,
                     fieldDisplay: result.fieldDisplay,
+                    fieldDisplayList: result.fieldDisplayList,
                 }).
                 fail(FAIL).
                 done(() => {
@@ -356,7 +363,7 @@
                             text: "pdf",
                         },
                     ],
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     }
                 },
@@ -365,7 +372,7 @@
                     type: "text",
                     title: i18n("tt.printDescription"),
                     placeholder: i18n("tt.printDescription"),
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     }
                 },
@@ -420,7 +427,7 @@
                     value: project.project,
                     title: i18n("tt.projectProject"),
                     placeholder: i18n("tt.projectProject"),
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     }
                 },
@@ -459,7 +466,7 @@
                             text: "64Mb"
                         },
                     ],
-                    validate: (v) => {
+                    validate: v => {
                         return parseInt(v) >= 0 && parseInt(v) <= 64 * 1024 * 1024;
                     }
                 },
@@ -774,6 +781,13 @@
                         }
                     },
                     {
+                        id: "fieldDisplayList",
+                        type: "text",
+                        title: i18n("tt.customFieldDisplayList"),
+                        placeholder: i18n("tt.customFieldDisplayList"),
+                        value: cf.fieldDisplayList,
+                    },
+                    {
                         id: "fieldDescription",
                         type: "text",
                         title: i18n("tt.customFieldDescription"),
@@ -1054,7 +1068,7 @@
                             text: "pdf",
                         },
                     ],
-                validate: (v) => {
+                validate: v => {
                         return $.trim(v) !== "";
                     },
                 },
@@ -1064,7 +1078,7 @@
                     title: i18n("tt.printDescription"),
                     placeholder: i18n("tt.printDescription"),
                     value: print.description,
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     },
                 },
@@ -1214,11 +1228,11 @@
 
         let f = [];
 
-        for (let i in modules.tt.meta.filtersExt) {
-            if (i.charAt(0) !== "#" && !modules.tt.meta.filtersExt[i].owner) {
+        for (let i in modules.tt.meta.filters) {
+            if (i.charAt(0) !== "#" && !modules.tt.meta.filters[i].owner) {
                 f.push({
                     id: i,
-                    text: modules.tt.meta.filtersExt[i].name ? (modules.tt.meta.filtersExt[i].name + " [" + i + "]") : i,
+                    text: modules.tt.meta.filters[i].name ? (modules.tt.meta.filters[i].name + " [" + i + "]") : i,
                 });
             }
         }
@@ -1304,8 +1318,8 @@
                     }
                 }
 
-                for (let i in modules.tt.meta.filtersExt) {
-                    if (!modules.tt.meta.filtersExt[i].owner) {
+                for (let i in modules.tt.meta.filters) {
+                    if (!modules.tt.meta.filters[i].owner) {
                         filters[i] = true;
                     }
                 }
@@ -1358,11 +1372,11 @@
                                             data: project.filters[i].projectFilterId,
                                         },
                                         {
-                                            data: trimStr(project.filters[i].filter?modules.tt.meta.filters[project.filters[i].filter]:project.filters[i].filter, 33, true),
+                                            data: trimStr(project.filters[i].filter ? modules.tt.meta.filters[project.filters[i].filter].name : project.filters[i].filter),
                                             nowrap: true,
                                         },
                                         {
-                                            data: trimStr(project.filters[i].filter, 33, true),
+                                            data: trimStr(project.filters[i].filter),
                                             nowrap: true,
                                         },
                                         {
@@ -2258,7 +2272,7 @@
             let height = $(window).height() - mainFormTop;
             let h = '';
             h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
-            h += `<pre class="ace-editor mt-2" id="workflowEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+            h += `<pre class="ace-editor mt-2" id="workflowEditor"></pre>`;
             h += "</div>";
             h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="workflowSave" class="hoverable saveButton"><i class="fas fa-save pr-2"></i>${i18n("tt.workflowSave")}</span></span>`;
             $("#mainForm").html(h);
@@ -2357,7 +2371,7 @@
                     type: "text",
                     title: i18n("tt.workflow"),
                     placeholder: i18n("tt.workflow"),
-                    validate: (v) => {
+                    validate: v => {
                         return !!v.match(/^[a-z_A-Z]\w*$/g);
                     }
                 },
@@ -2444,7 +2458,7 @@
             let height = $(window).height() - mainFormTop;
             let h = '';
             h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
-            h += `<pre class="ace-editor mt-2" id="libEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+            h += `<pre class="ace-editor mt-2" id="libEditor"></pre>`;
             h += "</div>";
             h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="libSave" class="hoverable saveButton"><i class="fas fa-save pr-2"></i>${i18n("tt.workflowLibSave")}</span></span>`;
             $("#mainForm").html(h);
@@ -2543,7 +2557,7 @@
                     type: "text",
                     title: i18n("tt.workflowLib"),
                     placeholder: i18n("tt.workflowLib"),
-                    validate: (v) => {
+                    validate: v => {
                         return $.trim(v) !== "";
                     }
                 },
@@ -2938,14 +2952,14 @@
             done(f => {
                 let readOnly = false;
                 try {
-                    readOnly = modules.tt.meta.filtersExt[filter].owner ? true : false;
+                    readOnly = modules.tt.meta.filters[filter].owner ? true : false;
                 } catch (_) {
                     //
                 }
                 let height = $(window).height() - mainFormTop;
                 let h = '';
                 h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
-                h += `<pre class="ace-editor mt-2" id="filterEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+                h += `<pre class="ace-editor mt-2" id="filterEditor"></pre>`;
                 h += "</div>";
                 if (!readOnly) {
                     h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="filterSave" class="hoverable saveButton"><i class="fas fa-save pr-2"></i>${i18n("tt.filterSave")}</span></span>`;
@@ -3029,10 +3043,12 @@
                 });
                 $("#filterSave").off("click").on("click", () => {
                     let f = false;
+                    let err;
                     try {
                         f = JSON.parse($.trim(editor.getValue()));
                     } catch (e) {
                         f = false;
+                        err = e.message;
                     }
                     if (f && $.trim(f.name) && f.fields) {
                         f.fileName = filter;
@@ -3047,7 +3063,11 @@
                         fail(FAIL).
                         fail(loadingDone);
                     } else {
-                        error(i18n("errors.invalidFilter"), i18n("error"), 30);
+                        if (err) {
+                            error(err, i18n("errors.invalidFilter"), 30);
+                        } else {
+                            error(i18n("errors.invalidFilter"), i18n("error"), 30);
+                        }
                     }
                 });
             }).
@@ -3086,7 +3106,7 @@
                     type: "text",
                     title: i18n("tt.filter"),
                     placeholder: i18n("tt.filter"),
-                    validate: (v) => {
+                    validate: v => {
                         return !!v.match(/^[a-z_A-Z]\w*$/g);
                     }
                 },
@@ -3139,24 +3159,24 @@
                     rows: () => {
                         let rows = [];
 
-                        for (let i in modules.tt.meta.filtersExt) {
+                        for (let i in modules.tt.meta.filters) {
                             rows.push({
                                 uid: i,
                                 cols: [
                                     {
-                                        data: trimStr(i, 33, true),
+                                        data: trimStr(i),
                                         nowrap: true,
                                     },
                                     {
-                                        data: trimStr(modules.tt.meta.filtersExt[i].owner?(users[modules.tt.meta.filtersExt[i].owner]?users[modules.tt.meta.filtersExt[i].owner]:modules.tt.meta.filtersExt[i].owner):i18n("tt.commonFilter"), 33, true),
+                                        data: trimStr(modules.tt.meta.filters[i].owner ? (users[modules.tt.meta.filters[i].owner] ? users[modules.tt.meta.filters[i].owner] : modules.tt.meta.filters[i].owner):i18n("tt.commonFilter")),
                                         nowrap: true,
                                     },
                                     {
-                                        data: trimStr(modules.tt.meta.filtersExt[i].name?modules.tt.meta.filtersExt[i].name:i, 128, true),
+                                        data: trimStr(modules.tt.meta.filters[i].name ? modules.tt.meta.filters[i].name : i, 128),
                                         nowrap: true,
                                     },
                                 ],
-                                class: modules.tt.meta.filtersExt[i].pipeline ? 'text-info' : '',
+                                class: modules.tt.meta.filters[i].pipeline ? 'text-info' : '',
                                 dropDown: {
                                     items: [
                                         {
@@ -3250,7 +3270,7 @@
                     for (let k in modules.tt.meta.filters) {
                         f.push({
                             id: k,
-                            text: modules.tt.meta.filters[k],
+                            text: modules.tt.meta.filters[k].name,
                         });
                     }
 
@@ -3287,7 +3307,7 @@
                             title: i18n("tt.crontab"),
                             placeholder: i18n("tt.crontab"),
                             options: crontabs,
-                            validate: (v) => {
+                            validate: v => {
                                 return $.trim(v) !== "" && $.trim(v) !== "-";
                             },
                         },
@@ -3392,7 +3412,7 @@
 
                 let filters = {};
                 for (let i in modules.tt.meta.filters) {
-                    filters[i] = modules.tt.meta.filters[i] + " [" + i + "]";
+                    filters[i] = modules.tt.meta.filters[i].name + " [" + i + "]";
                 }
 
                 cardTable({
@@ -3536,7 +3556,7 @@
                         title: i18n("tt.viewerField"),
                         placeholder: i18n("tt.viewerField"),
                         options: fields,
-                        validate: (v) => {
+                        validate: v => {
                             return $.trim(v) !== "";
                         }
                     },
@@ -3545,7 +3565,7 @@
                         type: "text",
                         title: i18n("tt.viewerName"),
                         placeholder: i18n("tt.viewerName"),
-                        validate: (v) => {
+                        validate: v => {
                             return $.trim(v) !== "";
                         }
                     },
@@ -3573,7 +3593,7 @@
             let height = $(window).height() - mainFormTop;
             let h = '';
             h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
-            h += `<pre class="ace-editor mt-2" id="viewerEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+            h += `<pre class="ace-editor mt-2" id="viewerEditor"></pre>`;
             h += "</div>";
             h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="viewerSave" class="hoverable saveButton"><i class="fas fa-save pr-2"></i>${i18n("tt.viewerSave")}</span></span>`;
             $("#mainForm").html(h);
@@ -3944,7 +3964,7 @@
             let height = $(window).height() - mainFormTop;
             let h = '';
             h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
-            h += `<pre class="ace-editor mt-2" id="printDataEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+            h += `<pre class="ace-editor mt-2" id="printDataEditor"></pre>`;
             h += "</div>";
             h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="printDataSave" class="hoverable saveButton"><i class="fas fa-save pr-2"></i>${i18n("tt.printDataSave")}</span></span>`;
             $("#mainForm").html(h);
@@ -4031,7 +4051,7 @@
             let height = $(window).height() - mainFormTop;
             let h = '';
             h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
-            h += `<pre class="ace-editor mt-2" id="printFormatterEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+            h += `<pre class="ace-editor mt-2" id="printFormatterEditor"></pre>`;
             h += "</div>";
             h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="printFormatterSave" class="hoverable saveButton"><i class="fas fa-save pr-2"></i>${i18n("tt.printFormatterSave")}</span></span>`;
             $("#mainForm").html(h);

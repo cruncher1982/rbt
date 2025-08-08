@@ -72,6 +72,8 @@
     },
 
     mqttCellMsg: function (topic, payload) {
+        if (!payload || !payload.uid) return;
+
         cell = $(".dataCell[data-uid=" + payload.uid + "]");
 
         if (cell && cell.length == 1) {
@@ -86,7 +88,62 @@
                     if (payload.login == lStore("_login") && payload.sid == modules.cs.sid) {
                         switch (parseInt(payload.step)) {
                             case 0:
-                                mYesNo(i18n("cs.coordinateOrReserve"), i18n("cs.action"), () => {
+                                if (AVAIL("cs", "reserveCell", "PUT")) {
+                                    mYesNo(i18n("cs.coordinateOrReserve"), i18n("cs.action"), () => {
+                                        cell.addClass("spinner-small");
+                                        PUT("cs", "cell", false, {
+                                            action: "claim",
+                                            step: 1,
+                                            sheet: md5($("#csSheet").val()),
+                                            date: md5($("#csDate").val()),
+                                            col: cell.attr("data-col"),
+                                            row: cell.attr("data-row"),
+                                            uid: cell.attr("data-uid"),
+                                            sid: modules.cs.sid,
+                                            expire: 300,
+                                        }).
+                                        fail(FAIL).
+                                        fail(() => {
+                                            cell.removeClass("spinner-small");
+                                        });
+                                    }, () => {
+                                        cardForm({
+                                            title: i18n("cs.reserve"),
+                                            footer: true,
+                                            borderless: true,
+                                            topApply: true,
+                                            fields: [
+                                                {
+                                                    id: "comment",
+                                                    type: "text",
+                                                    title: i18n("cs.comment"),
+                                                    placeholder: i18n("cs.comment"),
+                                                    validate: v => {
+                                                        return $.trim(v) !== "";
+                                                    }
+                                                },
+                                            ],
+                                            callback: result => {
+                                                cell.addClass("spinner-small");
+                                                PUT("cs", "reserveCell", false, {
+                                                    action: "reserve",
+                                                    sheet: md5($("#csSheet").val()),
+                                                    date: md5($("#csDate").val()),
+                                                    col: cell.attr("data-col"),
+                                                    row: cell.attr("data-row"),
+                                                    uid: cell.attr("data-uid"),
+                                                    sid: modules.cs.sid,
+                                                    expire: (modules.cs.currentSheet.sheet.reserveDays ? parseInt(modules.cs.currentSheet.sheet.reserveDays) : 21) * 24 * 60 * 60,
+                                                    comment: $.trim(result.comment),
+                                                }).
+                                                fail(FAIL).
+                                                fail(() => {
+                                                    cell.removeClass("spinner-small");
+                                                });
+                                            },
+                                        });
+                                    }, i18n("cs.coordinate"), i18n("cs.reserve"), 58 * 1000);
+                                } else {
                                     cell.addClass("spinner-small");
                                     PUT("cs", "cell", false, {
                                         action: "claim",
@@ -103,43 +160,7 @@
                                     fail(() => {
                                         cell.removeClass("spinner-small");
                                     });
-                                }, () => {
-                                    cardForm({
-                                        title: i18n("cs.reserve"),
-                                        footer: true,
-                                        borderless: true,
-                                        topApply: true,
-                                        fields: [
-                                            {
-                                                id: "comment",
-                                                type: "text",
-                                                title: i18n("cs.comment"),
-                                                placeholder: i18n("cs.comment"),
-                                                validate: (v) => {
-                                                    return $.trim(v) !== "";
-                                                }
-                                            },
-                                        ],
-                                        callback: result => {
-                                            cell.addClass("spinner-small");
-                                            PUT("cs", "reserveCell", false, {
-                                                action: "reserve",
-                                                sheet: md5($("#csSheet").val()),
-                                                date: md5($("#csDate").val()),
-                                                col: cell.attr("data-col"),
-                                                row: cell.attr("data-row"),
-                                                uid: cell.attr("data-uid"),
-                                                sid: modules.cs.sid,
-                                                expire: (modules.cs.currentSheet.sheet.reserveDays ? parseInt(modules.cs.currentSheet.sheet.reserveDays) : 21) * 24 * 60 * 60,
-                                                comment: $.trim(result.comment),
-                                            }).
-                                            fail(FAIL).
-                                            fail(() => {
-                                                cell.removeClass("spinner-small");
-                                            });
-                                        },
-                                    });
-                                }, i18n("cs.coordinate"), i18n("cs.reserve"), 58 * 1000);
+                                }
                                 break;
 
                             case 1:
@@ -199,6 +220,7 @@
 
                                 modules.tt.issue.issueAction(modules.cs.preCoordinate.issueId, modules.cs.currentSheet.sheet.action, () => {
                                     message(i18n("cs.wasCoordinated"));
+                                    lStore("_coordinate_issue", null);
 /*
                                     PUT("cs", "cell", false, {
                                         action: "release",
@@ -242,7 +264,7 @@
     },
 
     mqttRedisExpireMsg: function (topic, payload) {
-        if (payload.key.substring(0, 5) == "cell_") {
+        if (payload.key.substring(0, 5) == "cell_" && payload.key.split("_")[5]) {
             let cell = $(".dataCell[data-uid=" + payload.key.split("_")[5] + "]");
             if (cell && cell.length == 1) {
                 cell.removeClass("spinner-small");
@@ -927,6 +949,7 @@
                     }
 
                     if (col_name) {
+                        loadingStart();
                         let bulk = {
                             project: modules.cs.currentSheet.sheet.project,
                             query: { },
@@ -942,6 +965,7 @@
                         PUT("tt", "bulkAction", false, bulk).
                         fail(FAIL).
                         done(() => {
+                            loadingDone();
                             message(i18n("cs.done"));
                         });
                     } else {
@@ -993,7 +1017,17 @@
                         h += '<tr>';
                         h += '<td nowrap class="pl-2 pr-2">' + issues[i][modules.cs.currentSheet.sheet.fields.row] + '</td>';
                         h += '<td nowrap class="pl-2 pr-2"><a href="?#tt&issue=' + issues[i].issueId + '">' + issues[i].issueId + '</a></td>';
-                        h += '<td style="width: 100%;" class="pl-2 pr-2">' + (issues[i][modules.cs.currentSheet.sheet.fields.list] ? issues[i][modules.cs.currentSheet.sheet.fields.list] : '?') + '</td>';
+                        if (typeof modules.cs.currentSheet.sheet.fields.list == "string") {
+                            h += '<td style="width: 100%;" class="pl-2 pr-2">' + (issues[i][modules.cs.currentSheet.sheet.fields.list] ? issues[i][modules.cs.currentSheet.sheet.fields.list] : '?') + '</td>';
+                        } else
+                        if (typeof modules.cs.currentSheet.sheet.fields.list == "object") {
+                            let l = 0;
+                            for (let j = 0; j < modules.cs.currentSheet.sheet.fields.list.length - 1; j++) {
+                                l++;
+                                h += '<td nowrap class="pl-2 pr-2">' + (issues[i][modules.cs.currentSheet.sheet.fields.list[j]] ? issues[i][modules.cs.currentSheet.sheet.fields.list[j]] : '?') + '</td>';
+                            }
+                            h += '<td style="width: 100%;" class="pl-2 pr-2">' + (issues[i][modules.cs.currentSheet.sheet.fields.list[l]] ? issues[i][modules.cs.currentSheet.sheet.fields.list[l]] : '?') + '</td>';
+                        }
                         h += '</tr>';
                     }
 
@@ -1265,7 +1299,7 @@
                 sheetsOptions = "";
                 for (let i in sheets) {
                     if (sheets[i] == lStore("_sheet_name")) {
-                        sheetsOptions += "<option selected='selected'>" + escapeHTML(sheets[i]) + "</option>";
+                        sheetsOptions += "<option selected='selected' style='font-weight: bold;'>" + escapeHTML(sheets[i]) + "</option>";
                     } else {
                         sheetsOptions += "<option>" + escapeHTML(sheets[i]) + "</option>";
                     }
@@ -1274,7 +1308,7 @@
                 datesOptions = "";
                 for (let i in dates) {
                     if (dates[i] == lStore("_sheet_date")) {
-                        datesOptions += "<option selected='selected'>" + escapeHTML(dates[i]) + "</option>";
+                        datesOptions += "<option selected='selected' style='font-weight: bold;'>" + escapeHTML(dates[i]) + "</option>";
                     } else {
                         datesOptions += "<option>" + escapeHTML(dates[i]) + "</option>";
                     }
@@ -1282,8 +1316,8 @@
 
                 let rtd = "";
 
-                rtd += `<form autocomplete="off"><div class="form-inline ml-3 mr-3"><div class="input-group input-group-sm mt-1"><select id="csSheet" class="form-control select-arrow right-top-select">${sheetsOptions}</select></div></div></form>`;
-                rtd += `<form autocomplete="off"><div class="form-inline ml-3 mr-3"><div class="input-group input-group-sm mt-1"><select id="csDate" class="form-control select-arrow right-top-select">${datesOptions}</select></div></div></form>`;
+                rtd += `<form autocomplete="off"><div class="form-inline ml-3 mr-3"><div class="input-group input-group-sm mt-1"><select id="csSheet" class="form-control select-arrow right-top-select top-input">${sheetsOptions}</select></div></div></form>`;
+                rtd += `<form autocomplete="off"><div class="form-inline ml-3 mr-3"><div class="input-group input-group-sm mt-1"><select id="csDate" class="form-control select-arrow right-top-select top-input">${datesOptions}</select></div></div></form>`;
 
                 if (AVAIL("cs", "sheet", "PUT")) {
                     rtd += `<li class="nav-item nav-item-back-hover"><span id="cloneCSsheet" class="nav-link pointer" role="button" title="${i18n("cs.cloneSheet")}"><i class="fas fa-lg fa-fw fa-clone"></i></span></li>`;
@@ -1307,7 +1341,7 @@
                                 title: i18n("cs.date"),
                                 return: "asis",
                                 placeholder: i18n("cs.date"),
-                                validate: (v) => {
+                                validate: v => {
                                     return $.trim(v) !== "";
                                 }
                             },
@@ -1357,7 +1391,7 @@
                                 tags: true,
                                 createTags: true,
                                 options: sheetsOptions,
-                                validate: (v) => {
+                                validate: v => {
                                     return $.trim(v) !== "";
                                 }
                             },
@@ -1367,7 +1401,7 @@
                                 title: i18n("cs.date"),
                                 return: "asis",
                                 placeholder: i18n("cs.date"),
-                                validate: (v) => {
+                                validate: v => {
                                     return $.trim(v) !== "";
                                 }
                             },
